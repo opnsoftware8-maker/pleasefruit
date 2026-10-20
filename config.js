@@ -4,7 +4,7 @@ const CFG = {
   faceOffset: 0,          // ถ้าตัวละครหันหลังให้ทิศที่เดิน เปลี่ยนเป็น Math.PI
   speed: 6,
   half: 30,               // ครึ่งหนึ่งของความกว้างเกาะ (จำกัดไม่ให้เดินตกทะเล)
-  cam: { fov: Math.PI / 2, pitch: 50, dist: 13 },  // FOV 90°, เงยมอง 50°, กล้องอยู่ทิศใต้
+  cam: { fov: Math.PI / 1.3, pitch: 65, dist: 13 },  // FOV 90°, เงยมอง 50°, กล้องอยู่ทิศใต้
   // ไฟล์แอนิเมชัน KayKit (ไม่มีก็ได้ เกมยังรัน แต่ตัวละครจะยืนนิ่ง)
   anims: ['characters/Rig_Medium_General.glb', 'characters/Rig_Medium_MovementBasic.glb'],
 };
