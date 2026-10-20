@@ -11,10 +11,10 @@ const CFG = {
 
 // f = path ใต้ assets/, s = สเกล (ปรับเองถ้าชิ้นไหนใหญ่/เล็กไป), char = ตัวละคร
 const PREFABS = {
-  knight:    { f: 'characters/knight.glb',    s: 1, char: true },
-  rogue:     { f: 'characters/rogue.glb',     s: 1, char: true },
-  barbarian: { f: 'characters/barbarian.glb', s: 1, char: true },
-  mage:      { f: 'characters/mage.glb',      s: 1, char: true },
+  knight:    { f: 'characters/Knight.glb',    s: 1, char: true },
+  rogue:     { f: 'characters/Rogue.glb',     s: 1, char: true },
+  barbarian: { f: 'characters/Barbarian.glb', s: 1, char: true },
+  mage:      { f: 'characters/Mage.glb',      s: 1, char: true },
   sand:      { f: 'world/pirate/patch-sand-foliage.glb', s: 2 },
   grass:     { f: 'world/pirate/patch-grass.glb',        s: 2 },
   palmBend:  { f: 'world/pirate/palm-bend.glb',          s: 1.5 },
@@ -55,3 +55,4 @@ const PLACE = [
   // บอส (ผนังปราสาทด้านหลังแท่นเรียกบอส)
   ['wall', 14, 24, 0], ['wallWin', 20, 24, 0], ['wall', 26, 24, 0],
 ];
+   
