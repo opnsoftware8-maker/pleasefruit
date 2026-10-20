@@ -5,7 +5,7 @@ const CFG = {
   speed: 6,
   cell: 4,                  // 1 ช่องแผนที่ = 4 หน่วย
   step: 2,                  // 1 ระดับความสูง = 2 หน่วย
-  cam: { fov: Math.PI / 2, pitch: 50, dist: 13 },
+  cam: { fov: Math.PI / 2, pitch: 70, dist: 50 },
   anims: ['characters/Rig_Medium_General.glb', 'characters/Rig_Medium_MovementBasic.glb'],
 };
 
