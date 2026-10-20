@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Model Catalog</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #2b3340; font-family: system-ui, sans-serif; touch-action: none; }
+  #c { width: 100%; height: 100%; display: block; outline: none; }
+  #bar { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 8px; right: 8px; display: flex; gap: 8px; align-items: center; color: #fff; font-size: 14px; }
+  #st { flex: 1; background: rgba(20,30,50,.7); padding: 6px 12px; border-radius: 16px; }
+  button { background: #3b82f6; color: #fff; border: 0; border-radius: 16px; padding: 8px 14px; font-size: 14px; }
+  #panel { position: fixed; left: 0; right: 0; bottom: 0; height: 36%; overflow: auto; background: rgba(12,16,24,.88); color: #cfe3ff; font: 11px/1.5 monospace; padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 8px); white-space: pre; touch-action: pan-x pan-y; }
+  .bad { color: #ff8a8a; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="bar"><div id="st">กำลังโหลด…</div><button id="cp">คัดลอก</button><button id="tg">ซ่อนรายการ</button></div>
+<pre id="panel"></pre>
+<script src="https://cdn.jsdelivr.net/npm/babylonjs@7.0.0/babylon.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/babylonjs-loaders@7.0.0/babylonjs.loaders.min.js"></script>
+<script>
+const B = BABYLON, $ = id => document.getElementById(id);
+const L = (dir, arr) => arr.map(n => 'assets/' + dir + n + '.glb');
+const FILES = [
+  ...L('characters/', ['Knight', 'Rogue', 'Barbarian', 'Mage']),
+  ...L('world/pirate/', ['barrel','castle-door','castle-gate','castle-wall','castle-window','crate-bottles','crate','flag-high','flag-pennant','flag-pirate','grass','mast','palm-bend','palm-detailed-bend','palm-detailed-straight','palm-straight','patch-grass','patch-sand-foliage','patch-sand','platform-planks','platform','rocks-a','rocks-b','rocks-c','rocks-sand-a','rocks-sand-b','rocks-sand-c','ship-pirate-large','ship-pirate-medium','ship-wreck','structure-fence-sides','structure-fence','structure-roof','structure','tower-base','tower-complete-large','tower-middle-windows','tower-middle','tower-roof','tower-top']),
+  ...L('world/camp/', ['Tent','Tree-high','bridge','fence','ladder','patch-dirt','rocks-high','rocks-low','rocks-ramp','target','tree']),
+];
+
+// GLB อ้างหา Textures/colormap.png แต่ไฟล์อยู่ข้างๆ → เปลี่ยน path (เหมือนใน game.js)
+const fixTex = u => u.replace(/\/Textures\//i, '/');
+try { B.Tools.PreprocessUrl = fixTex; } catch (e) {}
+B.SceneLoader.OnPluginActivatedObservable.add(l => { if ('preprocessUrlAsync' in l || l.name === 'gltf') l.preprocessUrlAsync = u => Promise.resolve(fixTex(u)); });
+
+const engine = new B.Engine($('c'), false, { stencil: false });
+const scene = new B.Scene(engine);
+scene.clearColor = new B.Color4(0.17, 0.2, 0.25, 1);
+new B.HemisphericLight('h', new B.Vector3(0.3, 1, -0.3), scene).intensity = 1;
+const cam = new B.ArcRotateCamera('cam', -Math.PI / 2, 0.9, 60, B.Vector3.Zero(), scene);
+cam.attachControl($('c'), true);
+cam.minZ = 0.1; cam.maxZ = 1000; cam.lowerRadiusLimit = 2; cam.upperRadiusLimit = 400;
+cam.wheelPrecision = 10; cam.panningSensitivity = 30; cam.multiTouchPanning = true; cam.multiTouchPanAndZoom = true;
+
+function label(name, size, pos) {
+  const dt = new B.DynamicTexture('t', { width: 640, height: 128 }, scene, true);
+  dt.drawText(name, null, 52, 'bold 34px monospace', '#ffffff', '#16202e', true, false);
+  dt.drawText(size, null, 104, '32px monospace', '#ffd36b', null, true, true);
+  const m = new B.StandardMaterial('lm', scene);
+  m.emissiveTexture = dt; m.disableLighting = true; m.backFaceCulling = false;
+  const p = B.MeshBuilder.CreatePlane('lb', { width: 7.5, height: 1.5 }, scene);
+  p.material = m; p.position.copyFrom(pos); p.billboardMode = B.Mesh.BILLBOARDMODE_Y; p.isPickable = false;
+}
+
+(async () => {
+  const res = await Promise.all(FILES.map(path => {
+    const i = path.lastIndexOf('/') + 1;
+    return B.SceneLoader.LoadAssetContainerAsync(path.slice(0, i), path.slice(i), scene)
+      .then(c => ({ path, c })).catch(e => ({ path, err: ((e && (e.message || e.reason)) || e) + '' }));
+  }));
+  const lines = [], bad = [];
+  let x = 0, z = 0, rowD = 0, maxX = 0;
+  const MAXX = 80, SLOT = 7.5, GAP = 1.5;
+  for (const r of res) {
+    const name = r.path.replace('assets/', '').replace('.glb', '');
+    if (!r.c) { bad.push('✗ ' + r.path + '\n    ' + r.err.slice(0, 120)); continue; }
+    const inst = r.c.instantiateModelsToScene(n => n, false, { doNotInstantiate: true });
+    const root = inst.rootNodes[0], wrap = new B.TransformNode('w', scene);
+    root.parent = wrap; wrap.computeWorldMatrix(true); root.computeWorldMatrix(true);
+    root.getChildMeshes().forEach(m => { m.computeWorldMatrix(true); m.isPickable = false; });
+    const bb = root.getHierarchyBoundingVectors(true), mn = bb.min, mx = bb.max;
+    const w = mx.x - mn.x, h = mx.y - mn.y, d = mx.z - mn.z;
+    const slot = Math.max(w, SLOT) + GAP;
+    if (x + slot > MAXX) { x = 0; z += rowD + 5; rowD = 0; }
+    wrap.position.set(x + (slot - w) / 2 - mn.x, 0, z - mn.z);
+    label(name.split('/').pop(), `${w.toFixed(1)} x ${h.toFixed(1)} x ${d.toFixed(1)}`, new B.Vector3(x + slot / 2, 0.9, z - 1.6));
+    const f = v => v.toFixed(2);
+    lines.push(`${name}\n    ขนาด W${f(w)} H${f(h)} D${f(d)} | min x${f(mn.x)} y${f(mn.y)} z${f(mn.z)} | กลาง x${f(mn.x + w / 2)} z${f(mn.z + d / 2)}`);
+    x += slot; maxX = Math.max(maxX, x); rowD = Math.max(rowD, d);
+  }
+  const rows = z + rowD;
+  cam.target.set(maxX / 2, 0, rows / 2); cam.radius = Math.max(maxX, rows) * 0.9;
+  $('st').textContent = `โหลดได้ ${lines.length}/${FILES.length}` + (bad.length ? ` | ไม่ได้ ${bad.length}` : '');
+  const panel = $('panel');
+  panel.innerHTML = '';
+  const addTxt = (t, cls) => { const s = document.createElement('div'); s.textContent = t; if (cls) s.className = cls; panel.appendChild(s); };
+  bad.forEach(b => addTxt(b, 'bad'));
+  addTxt('หน่วย = หน่วยโลกของเกม (min = มุมต่ำสุดเทียบกับจุดกำเนิดโมเดล)');
+  lines.forEach(l => addTxt(l));
+  window._report = bad.join('\n') + '\n' + lines.join('\n');
+})().catch(e => { $('st').textContent = 'ERROR: ' + e.message; });
+
+engine.runRenderLoop(() => scene.render());
+addEventListener('resize', () => engine.resize());
+$('tg').onclick = () => { const p = $('panel'); const hide = p.style.display !== 'none'; p.style.display = hide ? 'none' : 'block'; $('tg').textContent = hide ? 'แสดงรายการ' : 'ซ่อนรายการ'; };
+$('cp').onclick = async () => { try { await navigator.clipboard.writeText(window._report || ''); $('cp').textContent = 'คัดลอกแล้ว'; } catch (e) { $('cp').textContent = 'คัดลอกไม่ได้'; } setTimeout(() => $('cp').textContent = 'คัดลอก', 1500); };
+</script>
+</body>
+</html>
