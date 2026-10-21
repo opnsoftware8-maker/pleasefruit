@@ -1,4 +1,4 @@
-// ===== game.js — พื้นหลายระดับ + ทางลาด + ชนหน้าผา/ของ =====
+// ===== game.js — พื้นหลายระดับ + ทางลาด + ชนหน้าผา/ของ + มอนสเตอร์มีชีวิต =====
 const B = BABYLON;
 const $ = id => document.getElementById(id);
 const log = m => { const l = $('log'); l.style.display = 'block'; l.textContent += m + '\n'; };
@@ -171,6 +171,8 @@ async function tryLoad(path) {
 
 let animDebugged = false, animConts = [];
 const props = [];
+const mobs = [];   // ← มอนสเตอร์ (tag 'mob'/'dummy') ที่มีชีวิต
+
 async function spawn(key, x, z, heading = 0, tag, dy = 0) {
   const p = PREFABS[key];
   if (p.flat) { const ch = chAt(Math.floor((x - X0) / CELL), Math.floor((ZN - z) / CELL)); if (!(ch in LV) || ch === 'p') return null; }
@@ -178,7 +180,16 @@ async function spawn(key, x, z, heading = 0, tag, dy = 0) {
   const wrap = new B.TransformNode('w', scene);
   wrap.position.set(x, Math.max(heightAt(x, z), -1.1) + dy + (p.dy || 0), z);
   wrap.rotation.y = heading + CFG.faceOffset;
-  const out = { wrap, tag, play() {} };
+  const out = { wrap, tag, key, play() {} };
+  out.home = { x, z };          // จุดเกิด — ใช้เป็นเส้นสำหรับเดินกลับ
+  out.homeRot = heading;        // ทิศหันหน้าเดิม
+  out.heading = heading;
+  out.state = 'idle';
+  // ลงทะเบียนมอนสเตอร์ (dummy ใช้ค่า MOB_AI.dummy เสมอ, mob ใช้ค่าตาม prefab rogue/barbarian)
+  if (tag === 'mob' || tag === 'dummy') {
+    const ai = MOB_AI[tag === 'dummy' ? 'dummy' : key];
+    if (ai) { out.ai = ai; out.hp = ai.hp; out.hpMax = ai.hp; mobs.push(out); }
+  }
   if (p.r) COLL.push([x, z, p.r]);
   if (!c) {
     const m = B.MeshBuilder.CreateBox('ph', { size: 1.5 }, scene);
@@ -219,6 +230,48 @@ function setupAnims(root, out) {
   out.play('idle');
 }
 
+// ---------- สมองมอนสเตอร์: idle → ตามผู้เล่น → หลุด leash → เดินกลับจุดเกิด ----------
+function updateMobs(dt) {
+  const p = player.wrap.position;
+  for (const m of mobs) {
+    const w = m.wrap.position, ai = m.ai;
+    const dp = Math.hypot(p.x - w.x, p.z - w.z);       // ระยะห่างผู้เล่น
+    const dh = Math.hypot(m.home.x - w.x, m.home.z - w.z); // ระยะห่างจากจุดเกิด
+    // เปลี่ยนสถานะ
+    if (m.state !== 'return' && dp <= ai.aggro && dh < ai.leash) m.state = 'chase';
+    else if (m.state === 'chase' && (dp > ai.aggro * 1.2 || dh >= ai.leash)) m.state = 'return';
+    // คำนวณทิศเดิน
+    let vx = 0, vz = 0;
+    if (m.state === 'chase') {
+      if (dp > 1.4) { vx = (p.x - w.x) / dp; vz = (p.z - w.z) / dp; }   // ตามจนใกล้สุด ~1.4 หน่วยแล้วหยุด
+    } else if (m.state === 'return') {
+      if (dh < 0.5) {          // ถึงบ้าน → หันหน้าเหมือนเดิม ยืน idle
+        m.state = 'idle';
+        w.y = heightAt(w.x, w.z);
+        m.heading = out_heading(m);
+        continue;
+      }
+      vx = (m.home.x - w.x) / dh; vz = (m.home.z - w.z) / dh;
+    }
+    // เคลื่อนที่ + หันหน้า + เล่นแอนิเมชัน
+    if (vx || vz) {
+      const sp = MOB_AI.speed;
+      tryMove(w, w.x + vx * sp * dt, w.z + vz * sp * dt);
+      const target = Math.atan2(vx, vz), diff = Math.atan2(Math.sin(target - m.heading), Math.cos(target - m.heading));
+      m.heading += diff * Math.min(1, dt * MOB_AI.turn);
+      m.wrap.rotation.y = m.heading + CFG.faceOffset;
+      m.play('move');
+    } else {
+      m.play(m.state === 'chase' ? 'move' : 'idle');
+    }
+    w.y = heightAt(w.x, w.z);
+  }
+}
+function out_heading(m) {  // ค่อย ๆ หันหน้ากลับทิศเดิมตอนถึงจุดเกิด (ตั้งตรงทันทีแบบง่าย)
+  m.wrap.rotation.y = m.homeRot + CFG.faceOffset;
+  return m.homeRot;
+}
+
 // ---------- ผู้เล่น + อินพุต ----------
 const joy = { x: 0, y: 0 }, keys = {};
 const jz = $('joy'), kn = $('knob'); let jid = null;
@@ -251,6 +304,7 @@ function update() {
     player.play('move');
   } else player.play('idle');
   p.y = heightAt(p.x, p.z);
+  updateMobs(dt);          // ← อัปเดตมอนสเตอร์ทุกเฟรม
   updateCam(p); fadeProps(p);
   const z = ZONES.find(z => Math.hypot(p.x - z.x, p.z - z.z) < z.r);
   $('zone').textContent = z ? z.name : 'ลานกลางเกาะ';
