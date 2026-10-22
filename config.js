@@ -5,7 +5,7 @@ const CFG = {
   speed: 6,
   cell: 4,
   step: 2,
-  cam: { fov: Math.PI / 2, pitch: 60, dist: 105 },
+  cam: { fov: Math.PI / 2, pitch: 34, dist: 37 },
   scale: 1.25,
   fenceStep: 2,
   farFreeze: 80,
