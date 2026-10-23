@@ -329,6 +329,7 @@ const RINGS=[[CASTLE[0],CASTLE[1],'#c0392b',9],[ARENA[0],ARENA[1],'#e67e22',6]];
 const TX=TOWN[0],TZ=TOWN[1];
 const TOWN_PROPS=[
   ['mage',TX,TZ-6,Math.PI,'npc']
+  ['campRocksHigh',-214, 172, 315]
 ];
 
 const PLACE=[
