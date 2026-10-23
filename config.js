@@ -215,13 +215,7 @@ const RINGS=[[CASTLE[0],CASTLE[1],'#c0392b',9],[ARENA[0],ARENA[1],'#e67e22',6]];
 
 const TX=TOWN[0],TZ=TOWN[1];
 const TOWN_PROPS=[
-  ['mage',TX,TZ-6,Math.PI,'npc'],['roof', 170,120,0],
-  ['flagNL',150,108,0],['flagNL',186,108,0],['flagHL',TX-10,TZ-30,0],['flagHL',TX+10,TZ-30,0],
-  ['barrel',146,124,0],['crate',152,126,.4],['crateB',153.2,127.2,1],['barrel',190,124,0],['crate',184,126,.4],['crate',188.5,128,1.2],
-  ['palmDS',72,118,0],['palmDB',262,116,0],['palmStr',72,150,0],['palmBend',262,148,0],['palmDS',100,60,0],['palmStr',236,60,0],
-  ...npcTo('mush',120,150,TX,112),...npcTo('npcGreen',216,150,TX,112),...npcTo('cat',190,92,TX,112),
-  ['rockSAL',96,188,0],['rockSBL',150,184,1],['rockSCL',196,184,2],['rockSAL',240,184,3],['rockSBL',266,146,4],['rockSCL',70,158,5],
-  ['rockSAL',266,92,6],['rockSBL',70,100,7],['rockSAL',210,186,.5],['rockSCL',126,186,1.5],
+  ['mage',TX,TZ-6,Math.PI,'npc']
 ];
 
 const PLACE=[
