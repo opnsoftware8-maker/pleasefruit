@@ -406,3 +406,10 @@ const ZONES=[
   {name:'ทุ่งมอนสเตอร์',x:-100,z:-6,r:80},
   {name:'ชายหาด',x:0,z:-95,r:330},
 ];
+camp: {
+  enabled: true,
+  position: { x: 0, y: 0, z: 0 },
+  rotationY: 0,
+  scale: 1,
+  spread: 1
+},
