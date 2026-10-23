@@ -1,6 +1,4 @@
 // ===== game.js — พื้นหลายระดับ + ทางลาด + ชนหน้าผา/ของ + มอนสเตอร์มีชีวิต =====
-import { buildCamp } from "./src/camp.js";
-import { CONFIG } from "./config.js";
 const B = BABYLON;
 const $ = id => document.getElementById(id);
 const log = m => { const l = $('log'); l.style.display = 'block'; l.textContent += m + '\n'; };
