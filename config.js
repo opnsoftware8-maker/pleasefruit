@@ -14,7 +14,7 @@ const CFG = {
   pathW: 5,
   seaSize: 1600,
   farClip: 900,
-  anims: ['characters/Rig_Medium_General.glb', 'characters/Rig_Medium_MovementBasic.glb'],
+  anims: ['characters/Rig_Medium_General.glb', 'characters/Rig_Medium_MovementBasic.glb', 'characters/Rig_Medium_MovementAdvanced.glb'],
 
   // ===== Stamina + Dash (อ่านโดย game.js — ลบบล็อกนี้ได้ จะใช้ค่าเริ่มต้นในเกมแทน) =====
   stamina: {
