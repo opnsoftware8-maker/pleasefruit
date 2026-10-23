@@ -87,7 +87,7 @@ const PREFABS = {
   gate:{f:'world/pirate/castle-gate.glb',s:1}, tower:{f:'world/pirate/tower-complete-large.glb',s:1,r:1.9},
   tBase:{f:'world/pirate/tower-base.glb',s:1,r:1.8}, tMidW:{f:'world/pirate/tower-middle-windows.glb',s:1},
   tTop:{f:'world/pirate/tower-top.glb',s:1}, tRoof:{f:'world/pirate/tower-roof.glb',s:1},
-  roof:{f:'world/pirate/structure-roof.glb',s:1.8}, house:{f:'world/pirate/structure.glb',s:1.6,r:2.2},
+  roof:{f:'world/pirate/structure-roof.glb',s:1}, house:{f:'world/pirate/structure.glb',s:1.6,r:2.2},
   mast:{f:'world/pirate/mast.glb',s:1,r:1}, flagH:{f:'world/pirate/flag-high.glb',s:1},
   flagP:{f:'world/pirate/flag-pirate.glb',s:1}, flagN:{f:'world/pirate/flag-pennant.glb',s:1},
   platform:{f:'world/pirate/platform.glb',s:2,r:1},
@@ -112,6 +112,119 @@ const PREFABS = {
   rockSAL:{f:'world/pirate/rocks-sand-a.glb',s:1.7,r:3.4,inst:true}, rockSBL:{f:'world/pirate/rocks-sand-b.glb',s:1.7,r:3.4,inst:true},
   rockSCL:{f:'world/pirate/rocks-sand-c.glb',s:1.8,r:3,inst:true},
   seaA:{f:'world/pirate/rocks-a.glb',s:2.2,inst:true}, seaB:{f:'world/pirate/rocks-b.glb',s:2.2,inst:true}, seaC:{f:'world/pirate/rocks-c.glb',s:2.4,inst:true},
+    // ===== PIRATE — โมเดลจากชุด Pirate =====
+  pirateCastleDoor:{f:'world/pirate/castle-door.glb',s:1},
+  piratePatchGrass:{f:'world/pirate/patch-grass.glb',s:1},
+  piratePatchSandFoliage:{f:'world/pirate/patch-sand-foliage.glb',s:1},
+  piratePatchSand:{f:'world/pirate/patch-sand.glb',s:1},
+  piratePlatformPlanks:{f:'world/pirate/platform-planks.glb',s:1},
+  pirateStructureFenceSides:{f:'world/pirate/structure-fence-sides.glb',s:1},
+  pirateStructureFence:{f:'world/pirate/structure-fence.glb',s:1},
+  pirateTowerMiddle:{f:'world/pirate/tower-middle.glb',s:1},
+
+  // ===== CAMP — โมเดลจากชุด Camp =====
+  campLadder:{f:'world/camp/ladder.glb',s:1},
+  campPatchDirt:{f:'world/camp/patch-dirt.glb',s:1},
+  campRocksHigh:{f:'world/camp/rocks-high.glb',s:1},
+  campRocksLow:{f:'world/camp/rocks-low.glb',s:1},
+  campRocksRamp:{f:'world/camp/rocks-ramp.glb',s:1},
+    // ===== SURVIVEKIT — โมเดลจากชุด SurviveKit =====
+
+  skBarrelOpen:{f:'world/survivekit/barrel-open.glb',s:1},
+  skBarrel:{f:'world/survivekit/barrel.glb',s:1},
+  skBedrollFrame:{f:'world/survivekit/bedroll-frame.glb',s:1},
+  skBedrollPacked:{f:'world/survivekit/bedroll-packed.glb',s:1},
+  skBedroll:{f:'world/survivekit/bedroll.glb',s:1},
+  skBottleLarge:{f:'world/survivekit/bottle-large.glb',s:1},
+  skBottle:{f:'world/survivekit/bottle.glb',s:1},
+  skBoxLargeOpen:{f:'world/survivekit/box-large-open.glb',s:1},
+  skBoxLarge:{f:'world/survivekit/box-large.glb',s:1},
+  skBoxOpen:{f:'world/survivekit/box-open.glb',s:1},
+  skBox:{f:'world/survivekit/box.glb',s:1},
+  skBucket:{f:'world/survivekit/bucket.glb',s:1},
+
+  skCampfireFishingStand:{f:'world/survivekit/campfire-fishing-stand.glb',s:1},
+  skCampfirePit:{f:'world/survivekit/campfire-pit.glb',s:1},
+  skCampfireStand:{f:'world/survivekit/campfire-stand.glb',s:1},
+  skChest:{f:'world/survivekit/chest.glb',s:1},
+
+  skFenceDoorway:{f:'world/survivekit/fence-doorway.glb',s:1},
+  skFenceFortified:{f:'world/survivekit/fence-fortified.glb',s:1},
+  skFence:{f:'world/survivekit/fence.glb',s:1},
+
+  skFishLarge:{f:'world/survivekit/fish-large.glb',s:1},
+  skFish:{f:'world/survivekit/fish.glb',s:1},
+
+  skFloorHole:{f:'world/survivekit/floor-hole.glb',s:1},
+  skFloorOld:{f:'world/survivekit/floor-old.glb',s:1},
+  skFloor:{f:'world/survivekit/floor.glb',s:1},
+
+  skGrassLarge:{f:'world/survivekit/grass-large.glb',s:1},
+  skGrass:{f:'world/survivekit/grass.glb',s:1},
+
+  skMetalPanelNarrow:{f:'world/survivekit/metal-panel-narrow.glb',s:1},
+  skMetalPanelScrewsHalf:{f:'world/survivekit/metal-panel-screws-half.glb',s:1},
+  skMetalPanelScrewsNarrow:{f:'world/survivekit/metal-panel-screws-narrow.glb',s:1},
+  skMetalPanelScrews:{f:'world/survivekit/metal-panel-screws.glb',s:1},
+  skMetalPanel:{f:'world/survivekit/metal-panel.glb',s:1},
+
+  skPatchGrassLarge:{f:'world/survivekit/patch-grass-large.glb',s:1},
+  skPatchGrass:{f:'world/survivekit/patch-grass.glb',s:1},
+
+  skResourcePlanks:{f:'world/survivekit/resource-planks.glb',s:1},
+  skResourceStoneLarge:{f:'world/survivekit/resource-stone-large.glb',s:1},
+  skResourceStone:{f:'world/survivekit/resource-stone.glb',s:1},
+  skResourceWood:{f:'world/survivekit/resource-wood.glb',s:1},
+
+  skRockA:{f:'world/survivekit/rock-a.glb',s:1},
+  skRockB:{f:'world/survivekit/rock-b.glb',s:1},
+  skRockC:{f:'world/survivekit/rock-c.glb',s:1},
+  skRockFlatGrass:{f:'world/survivekit/rock-flat-grass.glb',s:1},
+  skRockFlat:{f:'world/survivekit/rock-flat.glb',s:1},
+  skRockSandA:{f:'world/survivekit/rock-sand-a.glb',s:1},
+  skRockSandB:{f:'world/survivekit/rock-sand-b.glb',s:1},
+  skRockSandC:{f:'world/survivekit/rock-sand-c.glb',s:1},
+
+  skSignpostSingle:{f:'world/survivekit/signpost-single.glb',s:1},
+  skSignpost:{f:'world/survivekit/signpost.glb',s:1},
+
+  skStructureCanvas:{f:'world/survivekit/structure-canvas.glb',s:1},
+  skStructureFloor:{f:'world/survivekit/structure-floor.glb',s:1},
+  skStructureMetalDoorway:{f:'world/survivekit/structure-metal-doorway.glb',s:1},
+  skStructureMetalFloor:{f:'world/survivekit/structure-metal-floor.glb',s:1},
+  skStructureMetalRoof:{f:'world/survivekit/structure-metal-roof.glb',s:1},
+  skStructureMetalWall:{f:'world/survivekit/structure-metal-wall.glb',s:1},
+  skStructureMetal:{f:'world/survivekit/structure-metal.glb',s:1},
+  skStructureRoof:{f:'world/survivekit/structure-roof.glb',s:1},
+  skStructure:{f:'world/survivekit/structure.glb',s:1},
+
+  skTentCanvasHalf:{f:'world/survivekit/tent-canvas-half.glb',s:1},
+  skTentCanvas:{f:'world/survivekit/tent-canvas.glb',s:1},
+  skTent:{f:'world/survivekit/tent.glb',s:1},
+
+  skToolAxeUpgraded:{f:'world/survivekit/tool-axe-upgraded.glb',s:1},
+  skToolAxe:{f:'world/survivekit/tool-axe.glb',s:1},
+  skToolHammerUpgraded:{f:'world/survivekit/tool-hammer-upgraded.glb',s:1},
+  skToolHammer:{f:'world/survivekit/tool-hammer.glb',s:1},
+  skToolHoeUpgraded:{f:'world/survivekit/tool-hoe-upgraded.glb',s:1},
+  skToolHoe:{f:'world/survivekit/tool-hoe.glb',s:1},
+  skToolPickaxeUpgraded:{f:'world/survivekit/tool-pickaxe-upgraded.glb',s:1},
+  skToolPickaxe:{f:'world/survivekit/tool-pickaxe.glb',s:1},
+  skToolShovelUpgraded:{f:'world/survivekit/tool-shovel-upgraded.glb',s:1},
+  skToolShovel:{f:'world/survivekit/tool-shovel.glb',s:1},
+
+  skTreeAutumnTall:{f:'world/survivekit/tree-autumn-tall.glb',s:1},
+  skTreeAutumnTrunk:{f:'world/survivekit/tree-autumn-trunk.glb',s:1},
+  skTreeAutumn:{f:'world/survivekit/tree-autumn.glb',s:1},
+  skTreeLogSmall:{f:'world/survivekit/tree-log-small.glb',s:1},
+  skTreeLog:{f:'world/survivekit/tree-log.glb',s:1},
+  skTreeTall:{f:'world/survivekit/tree-tall.glb',s:1},
+  skTreeTrunk:{f:'world/survivekit/tree-trunk.glb',s:1},
+  skTree:{f:'world/survivekit/tree.glb',s:1},
+
+  skWorkbenchAnvil:{f:'world/survivekit/workbench-anvil.glb',s:1},
+  skWorkbenchGrind:{f:'world/survivekit/workbench-grind.glb',s:1},
+  skWorkbench:{f:'world/survivekit/workbench.glb',s:1},
 };
 
 const MON_DIR = {blob:'monster/blob/',big:'monster/big/',fly:'monster/flying/'};
