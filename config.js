@@ -7,7 +7,7 @@ const CFG = {
   cell: 4,
   lv: { ',': 0, g: 3, h: 6, A: 6, p: 0 },
   step: 3,
-  cam: { fov: Math.PI / 2, pitch: 34, dist: 37 },
+  cam: { fov: Math.PI / 2, pitch: 59, dist: 150 },
   scale: 1.25,
   fenceStep: 1, // เติมรั้วทุกช่วง ไม่เว้นช่อง
   farFreeze: 90,
