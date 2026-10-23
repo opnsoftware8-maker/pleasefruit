@@ -215,9 +215,7 @@ const RINGS=[[CASTLE[0],CASTLE[1],'#c0392b',9],[ARENA[0],ARENA[1],'#e67e22',6]];
 
 const TX=TOWN[0],TZ=TOWN[1];
 const TOWN_PROPS=[
-  ['mage',TX,TZ-6,Math.PI,'npc'],['roof',TX,TZ-1,0],
-  ...[[140,154],[172,154],[204,154],[236,154],[250,132],[250,100],[76,136],[76,96],[150,70],[194,70]].map(([x,z])=>['houseL',x,z,Math.PI]),
-  ...[[84,64],[252,64],[252,188],[84,188]].map(([x,z])=>['towerM',x,z,0]),
+  ['mage',TX,TZ-6,Math.PI,'npc'],['roof', 170,120,0],
   ['flagNL',150,108,0],['flagNL',186,108,0],['flagHL',TX-10,TZ-30,0],['flagHL',TX+10,TZ-30,0],
   ['barrel',146,124,0],['crate',152,126,.4],['crateB',153.2,127.2,1],['barrel',190,124,0],['crate',184,126,.4],['crate',188.5,128,1.2],
   ['palmDS',72,118,0],['palmDB',262,116,0],['palmStr',72,150,0],['palmBend',262,148,0],['palmDS',100,60,0],['palmStr',236,60,0],
