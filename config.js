@@ -111,19 +111,17 @@ const LIGHTING_CONFIG = {
 
   // แสงพระอาทิตย์ตกจากทิศตะวันออก
   // สมมติว่า +X คือทิศตะวันออกในแผนที่
-  sun: {
-    azimuth: 90,
-    elevation: 16,
-    color: [1.0, 0.58, 0.24],
-    intensity: 1.65,
-  },
-
-  // แสงฟ้าสีฟ้า และแสงเติมสีอุ่น
-  ambient: {
-    intensity: 0.68,
-    sky: [0.56, 0.70, 0.92],
-    ground: [0.78, 0.48, 0.25],
-  },
+ sun: {
+  azimuth: 90,
+  elevation: 15,
+  color: [1, 0.72, 0.24],
+  intensity: 2.20,
+},
+ambient: {
+  intensity: 0.72,
+  sky: [0.68, 0.82, 1],
+  ground: [0.72, 0.58, 0.3],
+},
 
   // เงาทอดยาวและมีรายละเอียด
   shadows: {
