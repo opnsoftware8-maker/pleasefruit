@@ -87,7 +87,7 @@ else {
   const sun = new B.DirectionalLight('s', new B.Vector3(-0.4, -1, 0.5), scene); sun.intensity = 0.55;
   ltPending = true;
   const s = document.createElement('script'); s.src = 'src/lighting.js';
-  s.onload = () => { Lt = Lighting; ltPending = false; Lt.init(scene, { B, engine, log }); attachLighting(); log('(โหลด src/lighting.js ให้อัตโนมัติ — แนะนำเพิ่ม <script src="src/lighting.js"></script> ใน index.html)'); };
+  s.onload = () => { Lt = Lighting; ltPending = false; Lt.init(scene, { B, engine, log }); attachLighting(); console.info('[lighting] โหลด src/lighting.js ให้อัตโนมัติ — แนะนำเพิ่ม <script src="src/lighting.js"></script> ใน index.html'); };
   s.onerror = () => { ltPending = false; ltQueue.length = 0; log('โหลด src/lighting.js ไม่ได้ (404?) — ใช้แสงเดิม ไม่มีเงา ตรวจว่าไฟล์อยู่ที่ src/lighting.js'); };
   document.head.appendChild(s);
 }
