@@ -101,34 +101,36 @@ const CFG = {
 };
 
   
+
 const LIGHTING_CONFIG = {
   enabled: true,
 
-  // ความสว่างโดยรวม
-  brightness: 2.23,
+  // ลดความสว่างรวมเพื่อไม่ให้สีฟอกขาว
+  brightness: 1.12,
   debug: false,
 
-  // แสงแดดหลัก
+  // แสงพระอาทิตย์ตกจากทิศตะวันออก
+  // สมมติว่า +X คือทิศตะวันออกในแผนที่
   sun: {
-    azimuth: -39,
-    elevation: 48,
-    color: [1.0, 0.97, 0.88],
-    intensity: 1.45,
+    azimuth: 90,
+    elevation: 16,
+    color: [1.0, 0.58, 0.24],
+    intensity: 1.65,
   },
 
-  // แสงฟ้าและแสงเติมในบริเวณเงา
+  // แสงฟ้าสีฟ้า และแสงเติมสีอุ่น
   ambient: {
-    intensity: 0.82,
-    sky: [0.70, 0.84, 1.0],
-    ground: [0.48, 0.52, 0.40],
+    intensity: 0.68,
+    sky: [0.56, 0.70, 0.92],
+    ground: [0.78, 0.48, 0.25],
   },
 
-  // ระบบเงา
+  // เงาทอดยาวและมีรายละเอียด
   shadows: {
     enabled: true,
     size: 2048,
-    radius: 75,
-    darkness: 0.25,
+    radius: 95,
+    darkness: 0.22,
     filter: 'pcf',
     quality: 'medium',
     bias: 0.0003,
@@ -137,7 +139,7 @@ const LIGHTING_CONFIG = {
     casterRefresh: 0.25,
   },
 
-  // วัตถุที่ทอดเงา
+  // ตัวละคร มอนสเตอร์ และวัตถุที่ทอดเงา
   casters: {
     characters: true,
     monsters: true,
@@ -151,9 +153,23 @@ const LIGHTING_CONFIG = {
       '^mast(L|M)?$',
       '^ship(L)?$',
       '^wreck$',
-      '^wallL$',
-      '^wallWinL$',
-      '^gateL$',
+      '^wall(L|Win)?$',
+      '^gateL?$',
+      '^tBase(L|M)?$',
+      '^tMidW(L|M)?$',
+      '^tTop(L|M)?$',
+      '^tRoof(L|M)?$',
+      '^flag(H|P|N)(L)?$',
+      '^platform$',
+      '^pirateCastleDoor$',
+      '^pirateStructureFence(Sides)?$',
+      '^pirateTowerMiddle$',
+      '^campLadder$',
+      '^campRocks(High|Low|Ramp)$',
+      '^skFence(Doorway|Fortified)?$',
+      '^skChest$',
+      '^skBarrel(Open)?$',
+      '^skBox(Large)?(Open)?$',
     ],
     exclude:
       'fx|puff|slash|particle|spark|trail|debug|helper|gizmo|hpbar|bar$|^ph$|ring|grip|shadow',
@@ -164,6 +180,7 @@ const LIGHTING_CONFIG = {
     terrain: true,
   },
 };
+
 
 
 // ---------- แผนที่: สร้างด้วยโค้ด ----------
