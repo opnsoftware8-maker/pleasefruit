@@ -105,7 +105,7 @@ const LIGHTING_CONFIG = {
   enabled: true,
 
   // ความสว่างโดยรวม
-  brightness: 1.08,
+  brightness: 1.6,
   debug: false,
 
   // แสงแดดหลัก
