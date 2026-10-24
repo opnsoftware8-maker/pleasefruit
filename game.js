@@ -72,13 +72,24 @@ const Display = (() => {
   layout();
   return api;
 })();
-// ---------- แสง: ปรับไฟเดิมผ่าน src/lighting.js (ไม่มีไฟล์นี้ → ใช้แสงเดิม ไม่มีเงา) ----------
-const Lt = typeof Lighting !== 'undefined' ? Lighting : null;
-if (Lt) Lt.init(scene, { B, engine });
+// ---------- แสง: ปรับไฟเดิมผ่าน src/lighting.js ----------
+// ไม่ได้ใส่แท็ก <script src="src/lighting.js"> ใน index.html → ใช้แสงเดิมก่อน แล้วโหลดไฟล์ให้เองทีหลัง (ระบบแสงจะปรับไฟเดิม ไม่สร้างซ้ำ)
+let Lt = typeof Lighting !== 'undefined' ? Lighting : null, ltPending = false;
+const ltQueue = [];   // โมเดลที่ spawn ก่อนระบบแสงพร้อม — ลงทะเบียนทอดเงาทีหลัง
+function attachLighting() {   // ต่อพื้นรับเงา + ลงทะเบียนโมเดลที่ค้างอยู่
+  if (!Lt) return;
+  if (typeof LIGHTING_CONFIG === 'undefined' || (LIGHTING_CONFIG.receivers || {}).terrain !== false) Lt.addReceiver(ter);
+  ltQueue.splice(0).forEach(a => Lt.register(...a));
+}
+if (Lt) Lt.init(scene, { B, engine, log });
 else {
-  log('ไม่พบ src/lighting.js — ใช้แสงเดิม (ไม่มีเงา)');
   new B.HemisphericLight('h', new B.Vector3(0.3, 1, -0.2), scene).intensity = 0.95;
   const sun = new B.DirectionalLight('s', new B.Vector3(-0.4, -1, 0.5), scene); sun.intensity = 0.55;
+  ltPending = true;
+  const s = document.createElement('script'); s.src = 'src/lighting.js';
+  s.onload = () => { Lt = Lighting; ltPending = false; Lt.init(scene, { B, engine, log }); attachLighting(); log('(โหลด src/lighting.js ให้อัตโนมัติ — แนะนำเพิ่ม <script src="src/lighting.js"></script> ใน index.html)'); };
+  s.onerror = () => { ltPending = false; ltQueue.length = 0; log('โหลด src/lighting.js ไม่ได้ (404?) — ใช้แสงเดิม ไม่มีเงา ตรวจว่าไฟล์อยู่ที่ src/lighting.js'); };
+  document.head.appendChild(s);
 }
 
 // ---------- กล้อง ----------
@@ -178,7 +189,7 @@ const vd = new B.VertexData(); vd.positions = P; vd.indices = I; vd.normals = N;
 const ter = new B.Mesh('terrain', scene); vd.applyToMesh(ter);
 const tm = new B.StandardMaterial('tm', scene); tm.specularColor = B.Color3.Black(); tm.backFaceCulling = false;
 ter.material = tm; ter.isPickable = false; ter.freezeWorldMatrix();
-if (Lt && (typeof LIGHTING_CONFIG === 'undefined' || (LIGHTING_CONFIG.receivers || {}).terrain !== false)) Lt.addReceiver(ter);   // พื้นรับเงา
+attachLighting();   // พื้นรับเงา (+ลงทะเบียนโมเดลที่ spawn ไปก่อนหน้า)
 
 const mat = hex => { const m = new B.StandardMaterial('m', scene); m.diffuseColor = B.Color3.FromHexString(hex); m.specularColor = B.Color3.Black(); return m; };
 const sea = B.MeshBuilder.CreateGround('sea', { width: CFG.seaSize || 600, height: CFG.seaSize || 600 }, scene);
@@ -299,7 +310,7 @@ async function spawn(key, x, z, heading = 0, tag, dy = 0) {
     wrap.computeWorldMatrix(true);
     meshes.forEach(m => { m.computeWorldMatrix(true); m.freezeWorldMatrix(); });
   }
-  if (Lt) Lt.register(root, key, p);   // ตัวละคร/มอน/โมเดลสำคัญทอดเงา (โมเดลที่โหลดทีหลังก็ถูกลงทะเบียนตอน spawn)
+  if (Lt) Lt.register(root, key, p); else if (ltPending) ltQueue.push([root, key, p]);   // ตัวละคร/มอน/โมเดลสำคัญทอดเงา (โมเดลที่โหลดทีหลังก็ถูกลงทะเบียนตอน spawn)
   return out;
 }
 const monLogged = new Set();
