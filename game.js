@@ -291,15 +291,19 @@ function setupAnims(root, out) {
     const cl = g.clone('c_' + g.name, t => map[t.name] || null); cl.stop(); groups.push(cl);
   }));
   groups.forEach(g => g.targetedAnimations.forEach(t => { t.animation.enableBlending = true; t.animation.blendingSpeed = ANIM_CFG.blend; }));   // ผสมท่าให้เปลี่ยนนุ่ม
-  if (!window._clipList) { window._clipList = 1; console.info('[anims] ท่าที่โหลดได้ ' + groups.length + ' ท่า:', groups.map(g => g.name).join(', ')); }
+  if (!window._clipList) { window._clipList = 1; console.info('[anims] ท่าที่โหลดได้ ' + groups.length + ' ท่า:', groups.map(g => g.name.replace(/^c_/, '')).join(', ')); }
 
   // จับคู่ state → AnimationGroup
   const states = {};
   for (const k in ANIM_STATES) {
-    const d = ANIM_STATES[k]; let g = null;
-    for (const rx of [].concat(d.clip)) { g = groups.find(x => rx.test(x.name)); if (g) break; }
-    if (g) states[k] = Object.assign({}, d, { g });
+    const d = ANIM_STATES[k]; let g = null, idx = -1;
+    [].concat(d.clip).some((rx, i) => { g = groups.find(x => rx.test(x.name.replace(/^c_/, ''))); idx = i; return !!g; });   // เทียบกับชื่อคลิปเดิม (ตัด 'c_' ที่ใส่ตอน clone) ไม่งั้น regex แบบ ^ชื่อ$ จะไม่เจอ
+    if (g) states[k] = Object.assign({}, d, { g, idx });
   }
+  // ท่าต่อสู้ที่ต้องใช้ท่าสำรอง (ชื่อตรงไม่เจอ) → แจ้งบนจอครั้งเดียว จะได้รู้ว่าไฟล์ท่าไม่ถูกโหลด/ชื่อคลิปไม่ตรง
+  const weakAtk = Object.keys(ANIM_STATES).filter(k => /^atk(?!2h|Dual)/.test(k) && (!states[k] || states[k].idx > 0));
+  if (weakAtk.length && !window._atkWarned && (window._atkWarned = 1))
+    log('ท่าฟันบางท่าไม่พบคลิปชื่อตรง: ' + weakAtk.join(', ') + '\n  ตรวจว่าโหลด weapon/Rig_Medium_CombatMelee.glb ใน CFG.anims แล้ว (ต้องอยู่ที่ assets/weapon/)');
   if (!animDebugged && (!states.idle || !(states.walk || states.run))) {
     animDebugged = true;
     log('แอนิเมชัน: พบ ' + groups.length + ' ท่า, idle=' + !!states.idle + ', walk=' + !!states.walk + ', run=' + !!states.run + '\n  ชื่อ: ' + groups.slice(0, 6).map(g => g.name).join(', '));
