@@ -72,8 +72,14 @@ const Display = (() => {
   layout();
   return api;
 })();
-new B.HemisphericLight('h', new B.Vector3(0.3, 1, -0.2), scene).intensity = 0.95;
-const sun = new B.DirectionalLight('s', new B.Vector3(-0.4, -1, 0.5), scene); sun.intensity = 0.55;
+// ---------- แสง: ปรับไฟเดิมผ่าน src/lighting.js (ไม่มีไฟล์นี้ → ใช้แสงเดิม ไม่มีเงา) ----------
+const Lt = typeof Lighting !== 'undefined' ? Lighting : null;
+if (Lt) Lt.init(scene, { B, engine });
+else {
+  log('ไม่พบ src/lighting.js — ใช้แสงเดิม (ไม่มีเงา)');
+  new B.HemisphericLight('h', new B.Vector3(0.3, 1, -0.2), scene).intensity = 0.95;
+  const sun = new B.DirectionalLight('s', new B.Vector3(-0.4, -1, 0.5), scene); sun.intensity = 0.55;
+}
 
 // ---------- กล้อง ----------
 const cam = new B.FreeCamera('cam', new B.Vector3(0, 10, -9), scene);
@@ -172,6 +178,7 @@ const vd = new B.VertexData(); vd.positions = P; vd.indices = I; vd.normals = N;
 const ter = new B.Mesh('terrain', scene); vd.applyToMesh(ter);
 const tm = new B.StandardMaterial('tm', scene); tm.specularColor = B.Color3.Black(); tm.backFaceCulling = false;
 ter.material = tm; ter.isPickable = false; ter.freezeWorldMatrix();
+if (Lt && (typeof LIGHTING_CONFIG === 'undefined' || (LIGHTING_CONFIG.receivers || {}).terrain !== false)) Lt.addReceiver(ter);   // พื้นรับเงา
 
 const mat = hex => { const m = new B.StandardMaterial('m', scene); m.diffuseColor = B.Color3.FromHexString(hex); m.specularColor = B.Color3.Black(); return m; };
 const sea = B.MeshBuilder.CreateGround('sea', { width: CFG.seaSize || 600, height: CFG.seaSize || 600 }, scene);
@@ -292,6 +299,7 @@ async function spawn(key, x, z, heading = 0, tag, dy = 0) {
     wrap.computeWorldMatrix(true);
     meshes.forEach(m => { m.computeWorldMatrix(true); m.freezeWorldMatrix(); });
   }
+  if (Lt) Lt.register(root, key, p);   // ตัวละคร/มอน/โมเดลสำคัญทอดเงา (โมเดลที่โหลดทีหลังก็ถูกลงทะเบียนตอน spawn)
   return out;
 }
 const monLogged = new Set();
@@ -626,6 +634,7 @@ function update() {
   updateMobs(dt);          // ← อัปเดตมอนสเตอร์ทุกเฟรม
   Hx.update(dt);           // ← HP / ท่าตาย / เกิดใหม่ / แถบเลือด
   updateCam(p); if ((fc++ & 3) === 0) fadeProps(p);
+  if (Lt) Lt.update(dt, focus);   // กรอบเงาตามกล้อง
   const z = ZONES.find(z => Math.hypot(p.x - z.x, p.z - z.z) < z.r);
   $('zone').textContent = z ? z.name : 'ลานกลางเกาะ';
 }
