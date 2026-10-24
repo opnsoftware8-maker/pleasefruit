@@ -7,7 +7,7 @@ const CFG = {
   cell: 4,
   lv: { ',': 0, g: 3, h: 6, A: 6, p: 0 },
   step: 3,
-  cam: { fov: Math.PI / 2, pitch: 43, dist: 118 },
+  cam: { fov: Math.PI / 2, pitch: 34, dist: 14 },
   scale: 1.25,
   fenceStep: 1, // เติมรั้วทุกช่วง ไม่เว้นช่อง
   farFreeze: 90,
@@ -18,10 +18,10 @@ const CFG = {
 
   // ===== Stamina + Dash (อ่านโดย game.js — ลบบล็อกนี้ได้ จะใช้ค่าเริ่มต้นในเกมแทน) =====
   stamina: {
-    max: 100,          // Stamina สูงสุด
+    max: 1000,          // Stamina สูงสุด
     regen: 28,         // ฟื้นต่อวินาที
-    regenDelay: 0.9,   // หน่วงหลังใช้ก่อนเริ่มฟื้น (วินาที)
-    dashCost: 25,      // Dash 1 ครั้งกินเท่าไร (100 → Dash ติดกันได้ 4 ครั้ง)
+    regenDelay: 0.31,   // หน่วงหลังใช้ก่อนเริ่มฟื้น (วินาที)
+    dashCost: 15,      // Dash 1 ครั้งกินเท่าไร (100 → Dash ติดกันได้ 4 ครั้ง)
     hud: { left: 16, top: 52, width: 190, height: 12 },   // ตำแหน่งแถบ (px)
   },
   // ===== จอ: แนวนอน + เต็มจอ (อ่านโดย game.js) =====
