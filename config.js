@@ -118,9 +118,9 @@ const LIGHTING_CONFIG = {
   intensity: 2.20,
 },
 ambient: {
-  intensity: 0.72,
-  sky: [0.68, 0.82, 1],
-  ground: [0.72, 0.58, 0.3],
+  intensity: 1.14,
+  sky: [0.90, 0.92, 1],
+  ground: [0.92, 0.78, 0.4],
 },
 
   // เงาทอดยาวและมีรายละเอียด
