@@ -461,7 +461,13 @@ function setupAnims(root, out) {
 function updateMobs(dt) {
   const p = player.wrap.position;
   for (const m of mobs) {
-    if (m.dead) continue;                              // กำลังตาย/รอเกิดใหม่ (ดู src/health.js)
+    if (m.dead) { if (m.stunT) { m.stunT = 0; m.stunned = false; } continue; }   // กำลังตาย/รอเกิดใหม่ (ดู src/health.js) — ล้างสตันด้วย
+    if (m.stunT > 0) {                                 // สตัน (จากสกิล Z/X ใน combat.js): หยุดเดิน/AI/แอนิเมชันจนครบเวลา
+      m.stunT -= dt;
+      if (!m.stunned) { m.stunned = true; m.pause(); }
+      if (m.stunT > 0) continue;
+    }
+    if (m.stunned) { m.stunned = false; m.stunT = 0; if (m.far) m.pause(); else m.resume(); }   // หมดสตัน → เดินต่อจากเดิม
     const w = m.wrap.position, ai = m.ai;
     const dp = Math.hypot(p.x - w.x, p.z - w.z);       // ระยะห่างผู้เล่น
     const dh = Math.hypot(m.home.x - w.x, m.home.z - w.z); // ระยะห่างจากจุดเกิด
@@ -553,7 +559,8 @@ const RC = Object.assign({
   staminaPerSec: 0                        // วิ่งกิน Stamina ต่อวินาที (0 = ไม่กิน; ตั้ง >0 เมื่อหมดจะเดินแทน)
 }, CFG.run || {});
 const stam = { value: SC.max, since: 9, flash: 0 };
-const dash = { lean: 0, on: false, e: 0, dx: 0, dz: 0, cd: 0, buf: 0, trail: 0, fov: 0 };
+const dash = { lean: 0, on: false, e: 0, dx: 0, dz: 0, cd: 0, buf: 0, trail: 0, fov: 0,
+  dist: 0, dur: 0, iframe: 0, onStep: null, onEnd: null };   // dist/dur/iframe/onStep/onEnd = ค่าของ Dash รอบนี้ (Dash ปกติใช้ DC, สกิลส่งค่ามาเอง)
 window.Stamina = { cfg: SC, dash: DC, state: stam, add: n => { stam.value = Math.max(0, Math.min(SC.max, stam.value + n)); }, refill: () => { stam.value = SC.max; },
   spend: n => { if (stam.value < n) { stam.flash = 0.3; return false; } stam.value -= n; stam.since = 0; return true; } };   // ให้ระบบอื่น (combat.js) หัก Stamina
 
@@ -605,27 +612,52 @@ function updateStamina(dt) {
   dBtn.style.opacity = ready ? 1 : 0.45;
 }
 
-function startDash(mx, mz, l) {
+function startDash(mx, mz, l, o) {   // o = ตัวเลือกสำหรับสกิล { distance, duration, iframe, free, onStep, onEnd } — ไม่ส่ง = Dash ปกติ
   let dx, dz;
   if (l > 0.1) { dx = mx / l; dz = mz / l; } else { dx = Math.sin(heading); dz = Math.cos(heading); }   // ไม่ได้ดันจอย → พุ่งไปทางที่หันหน้าอยู่
   dash.on = true; dash.e = 0; dash.dx = dx; dash.dz = dz; dash.trail = 0; dash.buf = 0;
-  stam.value -= SC.dashCost; stam.since = 0;
+  dash.dist = (o && o.distance) || DC.distance; dash.dur = (o && o.duration) || DC.duration;
+  dash.iframe = o && o.iframe != null ? o.iframe : DC.iframe; dash.onStep = (o && o.onStep) || null; dash.onEnd = (o && o.onEnd) || null;
+  if (!(o && o.free)) { stam.value -= SC.dashCost; stam.since = 0; }   // สกิลหัก Stamina เองใน combat.js → ไม่หักซ้ำ
   heading = Math.atan2(dx, dz); player.wrap.rotation.y = heading + CFG.faceOffset;
   player.invuln = true; player.dashing = true;
-  const r = player.dash(DC.duration); dash.lean = r === 'real' ? 0 : DC.lean;   // ใช้ท่าสำรอง → เอนตัวไปข้างหน้าเพื่อให้ดูเป็นการพุ่ง
+  const r = player.dash(dash.dur); dash.lean = r === 'real' ? 0 : DC.lean;   // ใช้ท่าสำรอง → เอนตัวไปข้างหน้าเพื่อให้ดูเป็นการพุ่ง
   const p = player.wrap.position; puff(p.x, p.y, p.z);
 }
+function endDash() {
+  dash.on = false; dash.cd = DC.delay; dash.fov = 0; player.invuln = false; player.dashing = false; player.wrap.rotation.x = 0;
+  const f = dash.onEnd; dash.onStep = dash.onEnd = null;
+  if (f) { try { f(); } catch (e) { console.error('[dash] onEnd', e); } }
+}
 function stepDash(dt, p) {
-  const e0 = dash.e, e1 = Math.min(DC.duration, e0 + dt), ease = u => 1 - (1 - u) * (1 - u);   // พุ่งเร็วตอนต้น แล้วชะลอ
-  const d = DC.distance * (ease(e1 / DC.duration) - ease(e0 / DC.duration)), n = Math.max(1, Math.ceil(d / 0.3));
+  const T = dash.dur, e0 = dash.e, e1 = Math.min(T, e0 + dt), ease = u => 1 - (1 - u) * (1 - u);   // พุ่งเร็วตอนต้น แล้วชะลอ
+  const d = dash.dist * (ease(e1 / T) - ease(e0 / T)), n = Math.max(1, Math.ceil(d / 0.3)), x0 = p.x, z0 = p.z;
   for (let k = 0; k < n; k++) tryMove(p, p.x + dash.dx * d / n, p.z + dash.dz * d / n);   // ก้าวย่อย: ไม่ทะลุของ/หน้าผา/น้ำ
   p.y = heightAt(p.x, p.z);
-  dash.e = e1; player.invuln = e1 < DC.iframe;
+  dash.e = e1; player.invuln = e1 < dash.iframe;
   if ((dash.trail -= dt) <= 0) { puff(p.x, p.y, p.z); dash.trail = 0.05; }
-  dash.fov = DC.fovKick * Math.sin(Math.PI * e1 / DC.duration);
-  if (dash.lean) player.wrap.rotation.x = dash.lean * Math.sin(Math.PI * e1 / DC.duration);   // เอนนุ่ม ๆ เข้า-ออก
-  if (e1 >= DC.duration) { dash.on = false; dash.cd = DC.delay; dash.fov = 0; player.invuln = false; player.dashing = false; player.wrap.rotation.x = 0; }
+  dash.fov = DC.fovKick * Math.sin(Math.PI * e1 / T);
+  if (dash.lean) player.wrap.rotation.x = dash.lean * Math.sin(Math.PI * e1 / T);   // เอนนุ่ม ๆ เข้า-ออก
+  if (dash.onStep) {   // สกิลตามเส้นทางพุ่ง (เช็กศัตรูที่โดนระหว่างทาง) — เรียกพร้อมตำแหน่งก่อน/หลังก้าวนี้
+    try { dash.onStep(x0, z0, p.x, p.z, e1 / T); } catch (e) { console.error('[dash] onStep', e); }
+    if (!dash.on) return;   // onStep สั่งหยุดพุ่ง (cancelDash) แล้ว
+  }
+  if (e1 >= T) endDash();
 }
+
+// ---------- API สำหรับสกิล (src/combat.js): พุ่งแบบชนของ/หน้าผาเหมือน Dash ปกติ แต่ไม่หัก Stamina ซ้ำ ----------
+function skillDash(o) {
+  if (!player || player.dead || dash.on) return false;
+  startDash(Math.sin(heading), Math.cos(heading), 1, Object.assign({ free: true }, o));
+  return true;
+}
+function cancelDash() { if (dash.on) endDash(); }
+function stunMob(m, dur) {   // สตันมอน: หยุดเดิน/แอนิเมชัน dur วินาที (ดู updateMobs) — ตาย/ไม่มีชีวิตแล้วสตันไม่ได้
+  if (!m || m.dead || m.phase !== 'alive' || !(dur > 0)) return false;
+  m.stunT = Math.max(m.stunT || 0, dur); return true;
+}
+function unstunMob(m) { if (m && m.stunT > 0) m.stunT = 0; }   // ปล่อยสตัน (updateMobs จะ resume ให้เอง)
+
 function update() {
   if (!player) return;
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
@@ -634,10 +666,10 @@ function update() {
   const p = player.wrap.position;
   updateStamina(dt);
   if (dash.cd > 0) dash.cd -= dt;
-  if (player.dead && dash.on) { dash.on = false; dash.fov = 0; player.invuln = false; player.dashing = false; player.wrap.rotation.x = 0; }   // ตายกลางทาง Dash → หยุดทันที
+  if (player.dead && dash.on) { dash.on = false; dash.fov = 0; player.invuln = false; player.dashing = false; player.wrap.rotation.x = 0; dash.onStep = dash.onEnd = null; }   // ตายกลางทาง Dash → หยุดทันที
   if (dash.buf > 0) {
     dash.buf -= dt;
-    if (!dash.on && dash.cd <= 0 && !player.dead) {
+    if (!dash.on && dash.cd <= 0 && !player.dead && !(Cb && Cb.specialActive)) {   // กำลังใช้สกิล Z/X → Dash ปกติไม่ติด
       if (stam.value >= SC.dashCost) startDash(mx, mz, l);
       else { stam.flash = 0.3; dash.buf = 0; }          // Stamina ไม่พอ → แถบกะพริบแดง
     }
@@ -645,7 +677,7 @@ function update() {
   const anim = player.anim;
   anim.tick(dt);
   if (dash.on) stepDash(dt, p);
-  else if (l > 0.1 && !anim.busy()) {
+  else if (l > 0.1 && !anim.busy() && !(Cb && Cb.specialActive)) {   // สกิลล็อกตัวผู้เล่นระหว่างใช้
     const running = (isHeld(RC.keys) || runToggle) && (RC.staminaPerSec <= 0 || stam.value > 0);
     if (running && RC.staminaPerSec > 0) { stam.value = Math.max(0, stam.value - RC.staminaPerSec * dt); stam.since = 0; }
     const spd = CFG.speed * (running ? RC.mult : 1);   // เดิน = CFG.speed, วิ่ง = CFG.speed × RC.mult
@@ -688,7 +720,8 @@ function fadeProps(p) {
   player = await spawn('knight', 0, 0, 0);
   if (Hx.bindPlayer) Hx.bindPlayer(player, Object.assign({ spawn: { x: 0, z: 0 }, heightAt }, CFG.player || {}));   // HP ผู้เล่น (src/health.js)
   if (Cb) Cb.init({ getPlayer: () => player, mobs, load, Health: _HP, Stamina: window.Stamina,
-    getHeading: () => heading, setHeading: h => { heading = h; player.wrap.rotation.y = h + CFG.faceOffset; }, cfg: CFG.combat || {} });   // อาวุธ/สกิล (src/combat.js)
+    getHeading: () => heading, setHeading: h => { heading = h; player.wrap.rotation.y = h + CFG.faceOffset; }, cfg: CFG.combat || {},
+    heightAt, skillDash, cancelDash, stun: stunMob, unstun: unstunMob });   // อาวุธ/สกิล (src/combat.js)
   updateCam(player.wrap.position, true);
   engine.runRenderLoop(() => { if (!Display.blocked) update(); scene.render(); });   // แนวตั้งบนมือถือ → พักเกมไว้
   $('load').style.display = 'none';

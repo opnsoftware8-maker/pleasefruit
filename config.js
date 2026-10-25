@@ -51,6 +51,8 @@ const CFG = {
     autoAim: true,                    // หันหามอนที่ใกล้ที่สุดตอนฟัน
     button: true,                     // ปุ่ม ATTACK บนจอ
     keys: { light: ['KeyJ'], heavy: ['KeyK'] },   // J = ฟันเบา (คอมโบตามอาวุธ), K = ฟันหนัก
+    specialKeys: { z: ['KeyZ'], x: ['KeyX'] },   // Z / X = สกิลพิเศษของอาวุธที่ถืออยู่ (ปุ่มบนจอมือถือสร้างโดย src/skill-ui.js; skillButtons:false = ซ่อน)
+    // skillFx: { glow: true, glowIntensity: 1.0, shake: true, maxSlashes: 26 },   // ปรับเอฟเฟกต์สกิล (src/skill-effects.js): ปิด glow/สั่นจอ หรือลดจำนวนเส้นสำหรับเครื่องช้า
     // ค่าเริ่มต้นของอาวุธ/คอมโบอยู่ใน src/combat.js — ที่นี่ใส่เฉพาะค่าที่อยากทับ
     //   stats: damage ดาเมจ / range ระยะ / arc มุมฟัน(องศา) / speed ความไว (2 = ไวขึ้นเท่าตัว, 0.5 = ช้าลงครึ่งหนึ่ง)
     //   combos.light: { loop, window, recovery, steps:[{ clip, time, hitAt, gap, mult, range, arc, dir, fx }] } — ทับทั้งก้อน
@@ -62,6 +64,28 @@ const CFG = {
         // stats: { damage: 10, range: 2.3, arc: 75, speed: 1 },     // ดาบสั้น 4 ท่า: ฟันระดับ→จามลง→แทง→ฟันเฉียงย้อน แล้ววนซ้ำ
         // fx: { color: [0.55, 0.95, 1] },
         // model: { path: 'weapon/dagger.gltf', pos: [0, 0, 0], rot: [0, 0, 0], scale: 1 },   // ปรับถ้าอาวุธเอียง/หลุดมือ
+
+        // ----- สกิลพิเศษ 2 ช่อง: Z และ X (อาวุธแต่ละชิ้นมีได้ช่องละ 1 สกิล — ไม่ใส่ special = ช่องนั้นว่าง) -----
+        // type: 'sonicDash' | 'slashBarrage'  ·  ดาเมจทุกทิก = stats.damage × mult × Health.player.stats.power
+        special: {
+          z: { type: 'sonicDash', name: 'Sonic Dash',
+            cooldown: 6, cost: 40,                                   // คูลดาวน์ (วินาที) / Stamina ที่หัก (หักครั้งเดียวตอนกด)
+            dash: { distance: 12, duration: 0.26, iframe: 0.26 },    // พุ่งไปข้างหน้า (ใช้ท่า Dodge Forward + ระบบชนของ game.js)
+            hitRadius: 1.5,                                          // รัศมีโดนศัตรูตลอดเส้นทางพุ่ง (ศัตรูตัวแรกที่เจอ)
+            aimRange: 14, aimArc: 80,                                // ช่วยเล็งก่อนพุ่ง (ใช้เมื่อ combat.autoAim เปิด)
+            boomSpacing: 1.5,                                        // ระยะห่างวงแหวนเสียงแตก
+            barrage: { duration: 0.75, tickInterval: 0.125, tickMult: 0.8, stun: 0.75 },   // ล็อก+สตัน 0.75 วิ: ดาเมจ 6 ทิก ทิกละ damage × 0.8
+          },
+          x: { type: 'slashBarrage', name: 'Slash Barrage',
+            cooldown: 14, cost: 120,
+            range: 8, maxTargets: 6,                                 // เป้าหมายในรัศมีนี้ (นับจากผู้เล่น) ถูกล็อก+สตัน
+            duration: 3, hitInterval: 0.25, tickMult: 0.5,           // รัว 3 วิ: ทุก 0.25 วิ ดาเมจ damage × 0.5 (รวม 12 ทิก)
+            stun: 3.6,                                               // สตัน (วินาที) — ตั้ง ≥ duration + finisherDelay เพื่อล็อกจนจบฟินิชเชอร์
+            finalMult: 6, finalRadius: 5,                            // ฟินิชเชอร์ครั้งเดียว: damage × 6 ทุกตัวในรัศมี 5 รอบจุดตก
+            finisherDelay: 0.4, impactDelay: 0.12, finisherTail: 0.6,
+            // anim: ['atkChop','atkHorizontal','atkDiagonal','atkChop'],  animFinish: ['atkJumpChop','atkChop']   // ชื่อ state จาก ANIM_STATES ใน combat.js เท่านั้น
+          },
+        },
       },
       sword: {
         // stats: { damage: 30, range: 3.6, arc: 150, speed: 1 },    // ดาบยาว 5 ท่า: ฟันระดับ→จามลง→แทง→ฟันย้อน→จามหนัก แล้ววนซ้ำ (พัก 0.5 วิก่อนวน)
