@@ -419,6 +419,7 @@ function setupAnims(root, out) {
   const api = {
     state: () => cur,
     has: n => !!states[n],
+    exact: n => !!(states[n] && states[n].idx === 0),   // true = เจอคลิปชื่อตรงจริง (ไม่ใช่ท่าสำรอง) — สกิลใช้เลือกท่าฟันจริงก่อนท่าสำรอง
     list: () => Object.keys(states),
     busy: () => !!(act && act.st.lockMove),
     // ท่าเคลื่อนที่ — เรียกทุกเฟรม ไม่ขัดจังหวะท่า action ที่กำลังเล่น
@@ -461,7 +462,7 @@ function setupAnims(root, out) {
 function updateMobs(dt) {
   const p = player.wrap.position;
   for (const m of mobs) {
-    if (m.dead) { if (m.stunT) { m.stunT = 0; m.stunned = false; } continue; }   // กำลังตาย/รอเกิดใหม่ (ดู src/health.js) — ล้างสตันด้วย
+    if (m.dead) { m.kb = null; if (m.stunT) { m.stunT = 0; m.stunned = false; } continue; }   // กำลังตาย/รอเกิดใหม่ (ดู src/health.js) — ล้างสตันด้วย
     if (m.stunT > 0) {                                 // สตัน (จากสกิล Z/X ใน combat.js): หยุดเดิน/AI/แอนิเมชันจนครบเวลา
       m.stunT -= dt;
       if (!m.stunned) { m.stunned = true; m.pause(); }
@@ -469,6 +470,10 @@ function updateMobs(dt) {
     }
     if (m.stunned) { m.stunned = false; m.stunT = 0; if (m.far) m.pause(); else m.resume(); }   // หมดสตัน → เดินต่อจากเดิม
     const w = m.wrap.position, ai = m.ai;
+    if (m.kb) {                                        // แรงผลักสั้นๆ จากสกิล (procedural) — ไม่สตัน ไม่เปลี่ยนแอนิเมชัน AI เดินต่อตามปกติ
+      const k = m.kb, ez = u => 1 - (1 - u) * (1 - u), t1 = Math.min(k.dur, k.t + dt), d = k.dist * (ez(t1 / k.dur) - ez(k.t / k.dur));
+      tryMove(w, w.x + k.vx * d, w.z + k.vz * d); k.t = t1; if (t1 >= k.dur) m.kb = null;
+    }
     const dp = Math.hypot(p.x - w.x, p.z - w.z);       // ระยะห่างผู้เล่น
     const dh = Math.hypot(m.home.x - w.x, m.home.z - w.z); // ระยะห่างจากจุดเกิด
     const far = dp > (CFG.farFreeze || 80);            // ไกลเกิน → หยุดแอนิเมชัน ไม่คำนวณ
@@ -656,6 +661,10 @@ function stunMob(m, dur) {   // สตันมอน: หยุดเดิน/
   if (!m || m.dead || m.phase !== 'alive' || !(dur > 0)) return false;
   m.stunT = Math.max(m.stunT || 0, dur); return true;
 }
+function knockMob(m, dx, dz, dist, dur) {   // ผลักมอนออกไป dist หน่วยใน dur วินาที (ชนของ/หน้าผาผ่าน tryMove) — ไม่ใช่สตัน
+  if (!m || m.dead || m.phase !== 'alive' || !(dist > 0) || !(dur > 0)) return false;
+  const l = Math.hypot(dx, dz) || 1; m.kb = { vx: dx / l, vz: dz / l, dist, dur, t: 0 }; return true;
+}
 function unstunMob(m) { if (m && m.stunT > 0) m.stunT = 0; }   // ปล่อยสตัน (updateMobs จะ resume ให้เอง)
 
 function update() {
@@ -721,7 +730,7 @@ function fadeProps(p) {
   if (Hx.bindPlayer) Hx.bindPlayer(player, Object.assign({ spawn: { x: 0, z: 0 }, heightAt }, CFG.player || {}));   // HP ผู้เล่น (src/health.js)
   if (Cb) Cb.init({ getPlayer: () => player, mobs, load, Health: _HP, Stamina: window.Stamina,
     getHeading: () => heading, setHeading: h => { heading = h; player.wrap.rotation.y = h + CFG.faceOffset; }, cfg: CFG.combat || {},
-    heightAt, skillDash, cancelDash, stun: stunMob, unstun: unstunMob });   // อาวุธ/สกิล (src/combat.js)
+    heightAt, skillDash, cancelDash, stun: stunMob, unstun: unstunMob, knock: knockMob });   // อาวุธ/สกิล (src/combat.js)
   updateCam(player.wrap.position, true);
   engine.runRenderLoop(() => { if (!Display.blocked) update(); scene.render(); });   // แนวตั้งบนมือถือ → พักเกมไว้
   $('load').style.display = 'none';

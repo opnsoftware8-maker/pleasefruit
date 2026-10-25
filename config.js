@@ -14,7 +14,7 @@ const CFG = {
   pathW: 5,
   seaSize: 1600,
   farClip: 900,
-  anims: ['characters/Rig_Medium_General.glb', 'characters/Rig_Medium_MovementBasic.glb', 'characters/Rig_Medium_MovementAdvanced.glb', 'weapon/Rig_Medium_CombatMelee.glb'],
+  anims: ['characters/Rig_Medium_General.glb', 'characters/Rig_Medium_MovementBasic.glb', 'characters/Rig_Medium_MovementAdvanced.glb', 'weapon/Rig_Medium_CombatMelee.glb', 'characters/Rig_Medium_CombatRanged.glb'],   // CombatRanged = ท่าสำรอง Ranged_Magic_Raise/Shoot ของสกิลดาบ (ยืนยันแล้วว่ามีในโฟลเดอร์ characters/)
 
   // ===== Stamina + Dash (อ่านโดย game.js — ลบบล็อกนี้ได้ จะใช้ค่าเริ่มต้นในเกมแทน) =====
   stamina: {
@@ -91,6 +91,27 @@ const CFG = {
         // stats: { damage: 30, range: 3.6, arc: 150, speed: 1 },    // ดาบยาว 5 ท่า: ฟันระดับ→จามลง→แทง→ฟันย้อน→จามหนัก แล้ววนซ้ำ (พัก 0.5 วิก่อนวน)
         // fx: { color: [1, 0.95, 0.75] },
         // model: { path: 'weapon/sword_1handed.gltf', pos: [0, 0, 0], rot: [0, 0, 0], scale: 1 },
+
+        // ----- สกิลพิเศษของดาบ (ไม่สตันศัตรู) -----
+        special: {
+          z: { type: 'piercingBeam', name: 'Piercing Beam',
+            cooldown: 8, cost: 60,
+            length: 26, width: 1.5,                                  // ความยาวลำแสง / ความกว้างครึ่งหนึ่งที่โดนดาเมจ (ทะลุทุกตัวในแนว)
+            beamMult: 3,                                             // ดาเมจลำแสง = stats.damage × 3 ต่อตัว (โดนครั้งเดียว)
+            explosion: { radius: 5.5, mult: 4, delay: 0.06 },        // ระเบิดที่ปลายลำแสง: ดาเมจวงกลม damage × 4 (ไม่สตัน ไม่ผลัก)
+            // melee: { anim: ['atkStab', 'atkChop'], time: 0.55, release: 0.3 },        // ท่าฟันดาบจริง (ต้องโหลด CombatMelee ได้ชื่อตรง) — ปล่อยลำแสงที่ release วินาที
+            // magic: { raiseTime: 0.4, shootTime: 0.5, releaseAt: 0.6 },                // ท่าสำรอง Ranged_Magic_Raise → Ranged_Magic_Shoot
+          },
+          x: { type: 'crescentWave', name: 'Crescent Wave',
+            cooldown: 12, cost: 100,
+            range: 40, speed: 30,                                    // คลื่นพุ่งไกล 40 หน่วย ความเร็ว 30 หน่วย/วินาที ครอบคลุม 180° ด้านหน้า
+            mult: 5,                                                 // ดาเมจสูง = stats.damage × 5 ต่อตัว (โดนครั้งเดียวตอนคลื่นผ่าน)
+            knock: { dist: 2.2, dur: 0.28 },                         // แรงผลักเล็กน้อย (procedural) — ไม่สตัน ไม่เปลี่ยนท่าของมอน
+            height: 6.5,                                             // ความสูงคลื่นเสี้ยวพระจันทร์
+            // melee: { anim: ['atkHorizontal', 'atkDiagonal'], time: 0.62, release: 0.34 },
+            // magic: { raiseTime: 0.4, shootTime: 0.5, releaseAt: 0.6 },
+          },
+        },
       },
     },
     skills: {
