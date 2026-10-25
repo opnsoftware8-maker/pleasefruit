@@ -105,7 +105,7 @@ const CFG = {
 const LIGHTING_CONFIG = {
   enabled: true,
 
-brightness: 1.08,
+brightness: 1.75,
 debug: false,
 
 // ท้องฟ้าจากภาพ PNG — ใส่ path ภาพที่ image เพื่อเปิดใช้ (null = ใช้ท้องฟ้าที่โค้ดสร้างเหมือนเดิม)
@@ -123,15 +123,15 @@ sky: {
 
 sun: {
   azimuth: -90,
-  elevation: 13,
-  color: [1.0, 0.46, 0.16],
-  intensity: 1.75,
+  elevation: 38,
+  color: [1.0, 0.91, 0.68],
+  intensity: 2.0,
 },
 
 ambient: {
-  intensity: 0.68,
-  sky: [0.58, 0.64, 0.84],
-  ground: [0.78, 0.42, 0.20],
+  intensity: 0.78,
+  sky: [0.68, 0.82, 1.0],
+  ground: [0.58, 0.54, 0.46],
 },
 
   // เงาทอดยาวและมีรายละเอียด
