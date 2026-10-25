@@ -9,6 +9,9 @@
 //   SkillFX.hitSpark(x,y,z, n)                   ประกายตอนโดนฟัน 1 ทิก
 //   SkillFX.lockRing(x,y,z, dur, size)           วงล็อกเป้าที่พื้น
 //   SkillFX.finisher({x,y,z}, {impactDelay})     X: เสาพลังขาวตกจากฟ้า + เศษแหลม + วงกระแทกพื้น + สั่นจอเบาๆ
+//   SkillFX.beam({x,y,z,yaw,length,speed,width})  ดาบ Z: ลำแสงยาวพร้อมวงแหวนเกลียวฟ้า-ม่วง (ภาพอ้างอิง Piercing Beam)
+//   SkillFX.explosion(x,y,z, radius)             ดาบ Z: ระเบิดทรงกลมขาว + วงหมุนวน + แรงกระแทก (ภาพอ้างอิงระเบิด)
+//   SkillFX.crescent({x,y,z,yaw,range,speed,startRadius,height})  ดาบ X: คลื่นเสี้ยวพระจันทร์ 3 ชั้นกวาด 180° ด้านหน้า
 //   SkillFX.cancelAll() / SkillFX.dispose()      ล้างเอฟเฟกต์ที่เล่นอยู่ / ทิ้งทุกอย่าง
 //
 // ทุกอย่างเป็นพูลขนาดคงที่ (ไม่สร้างเมชใหม่ระหว่างเล่น) — พูลเต็มก็แค่ข้ามเอฟเฟกต์ชิ้นนั้น ไม่ล้น/ไม่แลค
@@ -20,6 +23,9 @@ const SkillFX = (() => {
   const P = { ring: [], streak: [], slash: [], spark: [], shard: [], flare: [] };
   const barrages = [];
   const pil = { on: false, t: 0, x: 0, y: 0, z: 0, delay: 0.12, hold: 0.22, fade: 0.55, h: 44, hit: false, core: null, shell: null, halo: null };
+  const bm = { on: false, t: 0, x: 0, y: 0, z: 0, dx: 0, dz: 1, yaw: 0, L: 20, speed: 100, w: 1.5, ringT: 0, tipT: 0, core: null, mid: null, outer: null };
+  const ex = { on: false, t: 0, x: 0, y: 0, z: 0, R: 5, core: null, shell: null };
+  const cw = { on: false, t: 0, x: 0, y: 0, z: 0, yaw: 0, range: 40, speed: 30, r0: 1.2, h: 6.5, dustT: 0, waves: [] };
   const shk = { amp: 0, t: 0, dur: 0.3 };
   const camR = { x: 1, y: 0, z: 0 }, camU = { x: 0, y: 1, z: 0 };
   let tmpV = null, tmpR = null, tmpU = null;
@@ -65,6 +71,8 @@ const SkillFX = (() => {
   function buildMaterials() {
     mat.white = addMat('fxWhite', 1, 1, 1);
     mat.silver = addMat('fxSilver', 0.72, 0.86, 1);                    // เงินอมฟ้า ใช้เป็นฮาโล/ชั้นนอก
+    mat.cyan = addMat('fxCyan', 0.3, 0.9, 1); mat.violet = addMat('fxViolet', 0.8, 0.45, 1);
+    mat.blue = addMat('fxBlue', 0.35, 0.6, 1); mat.ice = addMat('fxIce', 0.82, 0.96, 1);
     mat.star = addMat('fxStarM', 1, 1, 1, tex.star);
     mat.soft = addMat('fxSoftM', 1, 1, 1, tex.soft);
   }
@@ -79,6 +87,18 @@ const SkillFX = (() => {
     if (glow) glow.addIncludedOnlyMesh(m);                             // Glow เฉพาะเมชเอฟเฟกต์ ไม่ทำให้ทั้งฉากเบลอ/แพง
     return m;
   }
+  function buildCrescent() {   // เสี้ยวพระจันทร์: โค้งครึ่งวงกลม 180° ในแนวราบ (x=sinθ, z=cosθ) สูงตรงกลาง เรียวแหลมถึงพื้นที่ปลาย — ขอบบน/ล่างสว่าง ตรงกลางโปร่ง
+    const N = 48, pos = [], col = [], idx = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, th = (u - 0.5) * Math.PI, sx = Math.sin(th), cz = Math.cos(th), sn = Math.sin(Math.PI * u);
+      const up = Math.pow(sn, 0.55), lo = up * (1 - 0.62 * sn);
+      pos.push(sx, up, cz, sx, (up + lo) / 2, cz, sx, lo, cz);
+      col.push(1, 1, 1, 1, 1, 1, 1, 0.16, 1, 1, 1, 0.9);
+    }
+    for (let i = 0; i < N; i++) for (let r = 0; r < 2; r++) { const a = i * 3 + r, b = (i + 1) * 3 + r; idx.push(a, b, b + 1, a, b + 1, a + 1); }
+    const m = new B.Mesh('fxCrescentT', scene), vd = new B.VertexData();
+    vd.positions = pos; vd.indices = idx; vd.colors = col; vd.applyToMesh(m); m.hasVertexAlpha = true; return m;
+  }
   const clone = (t, name) => { const m = t.clone(name); m.isVisible = false; if (glow) glow.addIncludedOnlyMesh(m); return m; };   // โคลนใช้เรขาคณิต/วัสดุร่วมกับต้นแบบ
   function buildPools() {
     const M = B.MeshBuilder;
@@ -86,18 +106,27 @@ const SkillFX = (() => {
     tpl.box = prep(M.CreateBox('fxBoxT', { size: 1 }, scene), mat.white);
     tpl.quad = prep(M.CreatePlane('fxQuadT', { size: 1 }, scene), mat.star);
     tpl.shard = prep(M.CreateCylinder('fxShardT', { height: 1, diameterTop: 0, diameterBottom: 0.2, tessellation: 4 }, scene), mat.white);
-    for (let i = 0; i < (O.maxRings || 22); i++) P.ring.push({ on: false, mesh: clone(tpl.ring, 'fxRing' + i) });
+    for (let i = 0; i < (O.maxRings || 30); i++) P.ring.push({ on: false, mesh: clone(tpl.ring, 'fxRing' + i) });
     for (let i = 0; i < (O.maxStreaks || 24); i++) P.streak.push({ on: false, mesh: clone(tpl.box, 'fxStreak' + i) });
     for (let i = 0; i < (O.maxSlashes || 26); i++) {
       const core = clone(tpl.box, 'fxSlash' + i), halo = clone(tpl.box, 'fxSlashH' + i);
       halo.material = mat.silver; halo.parent = core; halo.scaling.set(3.4, 3.4, 1); halo.isVisible = false;
       P.slash.push({ on: false, mesh: core, halo });
     }
-    for (let i = 0; i < (O.maxSparks || 70); i++) { const m = clone(tpl.quad, 'fxSpark' + i); m.billboardMode = B.Mesh.BILLBOARDMODE_ALL; P.spark.push({ on: false, mesh: m }); }
+    for (let i = 0; i < (O.maxSparks || 110); i++) { const m = clone(tpl.quad, 'fxSpark' + i); m.billboardMode = B.Mesh.BILLBOARDMODE_ALL; P.spark.push({ on: false, mesh: m }); }
     for (let i = 0; i < 6; i++) { const m = clone(tpl.quad, 'fxFlare' + i); m.billboardMode = B.Mesh.BILLBOARDMODE_ALL; m.material = mat.soft; P.flare.push({ on: false, mesh: m }); }
     for (let i = 0; i < (O.maxShards || 20); i++) P.shard.push({ on: false, mesh: clone(tpl.shard, 'fxShard' + i) });
     [P.ring, P.streak, P.spark, P.flare, P.shard].forEach(a => a.forEach(e => { e.mesh.isVisible = false; }));
     P.slash.forEach(e => { e.mesh.isVisible = false; e.halo.isVisible = false; });
+    // ลำแสง (แกนขาว / ปลอกฟ้า / ฮาโลม่วง), ทรงกลมระเบิด 2 ชั้น, คลื่นเสี้ยวพระจันทร์ 3 ชั้น
+    const cylB = (n, m2) => prep(M.CreateCylinder(n, { height: 1, diameter: 1, tessellation: 14 }, scene), m2);
+    bm.core = cylB('fxBeamCore', mat.white); bm.mid = cylB('fxBeamMid', mat.cyan); bm.outer = cylB('fxBeamOut', mat.violet);
+    tpl.sphere = prep(M.CreateSphere('fxSphereT', { diameter: 1, segments: 18 }, scene), mat.white);
+    ex.core = clone(tpl.sphere, 'fxExCore'); ex.shell = clone(tpl.sphere, 'fxExShell'); ex.shell.material = mat.ice;
+    tpl.crescent = prep(buildCrescent(), mat.ice);
+    [[mat.ice, 0, 1, 0.95], [mat.cyan, 0.09, 0.82, 0.85], [mat.blue, 0.18, 0.62, 0.75]].forEach(([mt, delay, hMul, v0], i) => {
+      const m = clone(tpl.crescent, 'fxWave' + i); m.material = mt; m.hasVertexAlpha = true; cw.waves.push({ mesh: m, delay, hMul, v0 });
+    });
     // เสาพลังฟินิชเชอร์ 3 ชั้น (แกน / เปลือก / ฮาโล) — กระบอกเปิดปลาย ไม่มีฝา
     const cyl = (n, m2) => prep(M.CreateCylinder(n, { height: 1, diameter: 1, tessellation: 28, cap: B.Mesh.NO_CAP }, scene), m2);
     pil.core = cyl('fxPilCore', mat.white); pil.shell = cyl('fxPilShell', mat.silver); pil.halo = cyl('fxPilHalo', mat.silver);
@@ -141,7 +170,7 @@ const SkillFX = (() => {
     e.on = true; e.t = 0; e.life = o.life || 0.4; e.s0 = o.s0; e.s1 = o.s1; e.v = o.v == null ? 1 : o.v;
     e.vx = o.vx || 0; e.vy = o.vy || 0; e.vz = o.vz || 0; e.pulse = o.pulse || 0; e.hold = o.hold || 0;
     m.material = o.mat || mat.white; m.position.set(o.x, o.y, o.z);
-    if (o.flat) m.rotation.set(0, 0, 0); else m.rotation.set(Math.PI / 2, o.yaw || 0, 0);   // แกนวงแหวนชี้ตามทิศพุ่ง
+    if (o.flat) m.rotation.set(o.tilt || 0, 0, (o.tilt || 0) * 0.6); else m.rotation.set(Math.PI / 2, o.yaw || 0, 0);   // แกนวงแหวนชี้ตามทิศพุ่ง
     m.scaling.setAll(o.s0); m.visibility = e.v; m.isVisible = true;
     return e;
   }
@@ -247,9 +276,42 @@ const SkillFX = (() => {
     if (O.shake !== false) { shk.amp = 0.4; shk.t = shk.dur = 0.45; }
   }
 
+  function beam(o) {                                                   // ดาบ Z: ลำแสงพุ่งยาวจากดาบ — วงแหวนฟ้า/ม่วงหมุนเกลียวรอบแกน
+    if (!ok) return;
+    Object.assign(bm, { on: true, t: 0, x: o.x, y: o.y, z: o.z, yaw: o.yaw, dx: Math.sin(o.yaw), dz: Math.cos(o.yaw), L: o.length, speed: o.speed, w: o.width, ringT: 0, tipT: 0 });
+    [bm.core, bm.mid, bm.outer].forEach(m => { m.rotation.set(Math.PI / 2, o.yaw, 0); m.isVisible = true; });
+    flareSpawn(o.x, o.y, o.z, 1.5, 5, 0.3, 1);
+    ringSpawn({ x: o.x + bm.dx * 0.6, y: o.y, z: o.z + bm.dz * 0.6, yaw: o.yaw, s0: 0.8, s1: 4.2, life: 0.35, v: 1, vx: bm.dx * 8, vz: bm.dz * 8, mat: mat.cyan });
+    burstSparks(o.x, o.y, o.z, 10, 8, 0.3, 0.3, 0, 0.8);
+    if (O.shake !== false && shk.t <= 0) { shk.amp = 0.12; shk.t = shk.dur = 0.25; }
+  }
+  function explosion(x, y, z, R) {                                     // ดาบ Z: ทรงกลมแสงขาวขยายเร็ว + วงหมุนวนหลายระดับ + เศษ/ฝุ่น
+    if (!ok) return;
+    Object.assign(ex, { on: true, t: 0, x, y, z, R });
+    ex.core.isVisible = true; ex.shell.isVisible = true;
+    ringSpawn({ x, y: y + 0.25, z, flat: true, s0: 2, s1: R * 3.4, life: 0.65, v: 1, mat: mat.cyan });
+    ringSpawn({ x, y: y + 0.3, z, flat: true, s0: 1.5, s1: R * 2.3, life: 0.5, v: 1, mat: mat.white });
+    [[0.9, 2.8, 0.8, mat.ice, 0.06], [2.3, 2.2, 0.7, mat.cyan, -0.05], [3.8, 1.6, 0.6, mat.white, 0.04]].forEach(([h, k, life, mt, tilt]) =>
+      ringSpawn({ x, y: y + h * (R / 5.5), z, flat: true, tilt, s0: R * 0.7, s1: R * k, life, v: 0.9, mat: mt }));
+    flareSpawn(x, y + R * 0.6, z, R * 1.4, R * 4.5, 0.45, 1);
+    for (let i = 0; i < 12; i++) { const a = rnd(0, 6.283), sp = rnd(6, 14); shardSpawn(x, y + 0.4, z, Math.cos(a) * sp, rnd(6, 13), Math.sin(a) * sp, rnd(0.7, 1.7), rnd(0.55, 0.9)); }
+    burstSparks(x, y + 0.5, z, 30, 14, 0.4, 0.8, -8, 1);
+    dustAt(x, y + 0.2, z, 45);
+    if (O.shake !== false) { shk.amp = 0.35; shk.t = shk.dur = 0.5; }
+  }
+  function crescent(o) {                                               // ดาบ X: คลื่นเสี้ยวพระจันทร์ 3 ชั้นไล่กันออกไป กวาดครอบ 180° ด้านหน้า
+    if (!ok) return;
+    Object.assign(cw, { on: true, t: 0, x: o.x, y: o.y + 0.05, z: o.z, yaw: o.yaw, range: o.range, speed: o.speed, r0: o.startRadius || 1.2, h: o.height || 6.5, dustT: 0 });
+    cw.waves.forEach(w => { w.mesh.isVisible = false; });
+    flareSpawn(o.x + Math.sin(o.yaw) * 1.5, o.y + 1.2, o.z + Math.cos(o.yaw) * 1.5, 1.5, 6, 0.3, 1);
+    ringSpawn({ x: o.x, y: o.y + 0.15, z: o.z, flat: true, s0: 2, s1: 9, life: 0.4, v: 0.9, mat: mat.ice });
+    if (O.shake !== false) { shk.amp = 0.2; shk.t = shk.dur = 0.35; }
+  }
+
   function cancelAll() {
     for (const k in P) P[k].forEach(e => { e.on = false; e.mesh.isVisible = false; if (e.halo) e.halo.isVisible = false; });
-    barrages.length = 0; pil.on = false;
+    barrages.length = 0; pil.on = false; bm.on = ex.on = cw.on = false;
+    [bm.core, bm.mid, bm.outer, ex.core, ex.shell].forEach(m => { if (m) m.isVisible = false; }); cw.waves.forEach(w => { w.mesh.isVisible = false; });
     if (pil.core) [pil.core, pil.shell, pil.halo].forEach(m => { m.isVisible = false; });
     if (glow) glow.isEnabled = false;
     shk.t = 0;
@@ -326,6 +388,64 @@ const SkillFX = (() => {
     const cy = bottom + H / 2, f = (m, dia, vis) => { m.position.set(pil.x, cy, pil.z); m.scaling.set(dia * w, H, dia * w); m.visibility = vis * a; m.isVisible = vis * a > 0.01; };
     f(pil.core, 2.2, 1); f(pil.shell, 3.9, 0.55); f(pil.halo, 6.2, 0.2);   // แกนขาวจัด + เปลือกเงิน + ฮาโลบางๆ (ไม่เต็มจอ)
   }
+  function setCyl(m, dia, len, cx, cy, cz, vis) { m.position.set(cx, cy, cz); m.scaling.set(dia, Math.max(0.01, len), dia); m.visibility = vis; }
+  function updBeam(dt) {
+    if (!bm.on) return 0;
+    bm.t += dt;
+    const full = bm.L / bm.speed, HOLD = 0.32, FADE = 0.35, age = bm.t - full;
+    if (age > HOLD + FADE) { bm.on = false; [bm.core, bm.mid, bm.outer].forEach(m => { m.isVisible = false; }); return 0; }
+    const k = age > HOLD ? clamp01((age - HOLD) / FADE) : 0, a = 1 - k * k, wv = 1 - 0.7 * k, pulse = 1 + 0.12 * Math.sin(bm.t * 60);
+    const len = Math.min(bm.L, bm.speed * bm.t), cx = bm.x + bm.dx * len / 2, cz = bm.z + bm.dz * len / 2;
+    setCyl(bm.core, 0.35 * bm.w * wv * pulse, len, cx, bm.y, cz, a);
+    setCyl(bm.mid, 0.9 * bm.w * wv, len, cx, bm.y, cz, 0.55 * a);
+    setCyl(bm.outer, 1.7 * bm.w * wv, len, cx, bm.y, cz, 0.22 * a);
+    const rx = bm.dz, rz = -bm.dx;                                      // ขวาของแนวลำแสง
+    for (let i = 0; i < 4; i++) {                                       // เกลียว 2 เส้นหมุนรอบแกน (จุดประกายสั้นๆ ต่อเนื่อง)
+      const u = rnd(0, len), ang = u * 0.7 - bm.t * 38 + (i & 1) * Math.PI, r = bm.w * rnd(0.9, 1.5) * wv;
+      sparkSpawn(bm.x + bm.dx * u + rx * Math.cos(ang) * r, bm.y + Math.sin(ang) * r, bm.z + bm.dz * u + rz * Math.cos(ang) * r, bm.dx * 6, 0, bm.dz * 6, 0.38, 0.14, 0);
+    }
+    if (age < HOLD && (bm.ringT -= dt) <= 0) {                          // วงแหวนขยายตามแนวลำแสง
+      bm.ringT = 0.03; const u = rnd(0.05, 1) * len, mt = [mat.cyan, mat.violet, mat.white, mat.blue][(Math.random() * 4) | 0];
+      ringSpawn({ x: bm.x + bm.dx * u, y: bm.y, z: bm.z + bm.dz * u, yaw: bm.yaw, s0: 1.2, s1: rnd(3.5, 6.2), life: 0.38, v: 0.9, vx: bm.dx * 10, vz: bm.dz * 10, mat: mt });
+    }
+    if ((bm.tipT -= dt) <= 0 && len < bm.L + 0.1) { bm.tipT = 0.05; flareSpawn(bm.x + bm.dx * len, bm.y, bm.z + bm.dz * len, 1.4, 3.6, 0.15, 1); }
+    return 1;
+  }
+  function updEx(dt) {
+    if (!ex.on) return 0;
+    ex.t += dt; const t = ex.t;
+    if (t > 0.85) { ex.on = false; ex.core.isVisible = ex.shell.isVisible = false; return 0; }
+    const s = ex.R * easeOut3(t / 0.16), f = clamp01((t - 0.3) / 0.55), cy = ex.y + s * 0.7;
+    ex.core.position.set(ex.x, cy, ex.z); ex.core.scaling.setAll(Math.max(0.01, 1.6 * s)); ex.core.visibility = 0.92 * (1 - Math.pow(f, 1.5));
+    ex.shell.position.set(ex.x, cy, ex.z); ex.shell.scaling.setAll(Math.max(0.01, 2.1 * s)); ex.shell.visibility = 0.38 * (1 - f);
+    return 1;
+  }
+  function updWaves(dt) {
+    if (!cw.on) return 0;
+    cw.t += dt; let live = 0;
+    for (const w of cw.waves) {
+      const tt = cw.t - w.delay, m = w.mesh;
+      if (tt < 0) { live++; continue; }
+      const r = cw.r0 + cw.speed * tt;
+      if (r >= cw.range) { m.isVisible = false; continue; }
+      live++;
+      const hh = cw.h * w.hMul * (0.55 + 0.45 * easeOut(Math.min(1, tt / 0.25))) * (1 + 0.5 * r / cw.range);   // สูงขึ้นเมื่อไกลออกไป
+      const fout = r > cw.range * 0.7 ? 1 - (r - cw.range * 0.7) / (cw.range * 0.3) : 1;
+      m.position.set(cw.x, cw.y, cw.z); m.rotation.y = cw.yaw; m.scaling.set(r, hh, r);
+      m.visibility = w.v0 * Math.min(1, tt / 0.06) * Math.max(0, fout); m.isVisible = true;
+    }
+    const tt = cw.t - cw.waves[0].delay;                                // ประกาย/ฝุ่น/เศษตามแนวหน้าคลื่น
+    if (tt >= 0) {
+      const r = cw.r0 + cw.speed * tt;
+      if (r < cw.range) {
+        for (let i = 0; i < 4; i++) { const a = cw.yaw + rnd(-1.45, 1.45), sx = Math.sin(a), cz = Math.cos(a); sparkSpawn(cw.x + sx * r, cw.y + rnd(0.1, 2.2), cw.z + cz * r, sx * 9, rnd(1, 4), cz * 9, rnd(0.3, 0.55), 0.3, -6); }
+        if ((cw.dustT -= dt) <= 0) { cw.dustT = 0.06; const a = cw.yaw + rnd(-1.4, 1.4); dustAt(cw.x + Math.sin(a) * r, cw.y + 0.2, cw.z + Math.cos(a) * r, 3);
+          const b = cw.yaw + rnd(-1.3, 1.3); shardSpawn(cw.x + Math.sin(b) * r, cw.y + 0.3, cw.z + Math.cos(b) * r, Math.sin(b) * 8, rnd(4, 9), Math.cos(b) * 8, rnd(0.6, 1.4), 0.5); }
+      }
+    }
+    if (!live) cw.on = false;
+    return live ? 1 : 0;
+  }
   function applyShake() {
     if (shk.t <= 0 || O.shake === false || !scene) return;
     const cam = scene.activeCamera; if (!cam) return;
@@ -337,7 +457,7 @@ const SkillFX = (() => {
     if (!ok || !scene || scene.isDisposed) return;
     dt = Math.min(dt, 0.05);
     camBasis(); updBarrages(dt); updPillar(dt);
-    const n = updPools(dt);
+    const n = updPools(dt) + updBeam(dt) + updEx(dt) + updWaves(dt);
     if (glow) glow.isEnabled = n > 0 || pil.on || barrages.length > 0;
   }
 
@@ -347,17 +467,18 @@ const SkillFX = (() => {
         if (shakeObs) scene.onBeforeRenderObservable.remove(shakeObs);
         if (disposeObs) scene.onDisposeObservable.remove(disposeObs);
         for (const k in P) P[k].forEach(e => { if (e.halo) e.halo.dispose(); e.mesh.dispose(); });
-        [pil.core, pil.shell, pil.halo, tpl.ring, tpl.box, tpl.quad, tpl.shard].forEach(m => m && m.dispose());
+        cw.waves.forEach(w => w.mesh.dispose());
+        [pil.core, pil.shell, pil.halo, bm.core, bm.mid, bm.outer, ex.core, ex.shell, tpl.ring, tpl.box, tpl.quad, tpl.shard, tpl.sphere, tpl.crescent].forEach(m => m && m.dispose());
         Object.values(mat).forEach(m => m.dispose()); Object.values(tex).forEach(t => t.dispose());
         if (dust) dust.dispose();
         if (glow) glow.dispose();
       }
     } catch (e) { console.warn('[skill-fx] dispose', e); }
     for (const k in P) P[k].length = 0;
-    barrages.length = 0; pil.on = false; pil.core = pil.shell = pil.halo = null;
+    barrages.length = 0; pil.on = bm.on = ex.on = cw.on = false; pil.core = pil.shell = pil.halo = bm.core = bm.mid = bm.outer = ex.core = ex.shell = null; cw.waves.length = 0;
     glow = dust = dustPos = shakeObs = disposeObs = null; ok = false; scene = null;
     Object.keys(mat).forEach(k => delete mat[k]); Object.keys(tex).forEach(k => delete tex[k]); Object.keys(tpl).forEach(k => delete tpl[k]);
   }
 
-  return { init, update, dashBoom, barrage, hitSpark, lockRing, finisher, cancelAll, dispose, get ready() { return ok; } };
+  return { init, update, dashBoom, barrage, hitSpark, lockRing, finisher, beam, explosion, crescent, cancelAll, dispose, get ready() { return ok; } };
 })();

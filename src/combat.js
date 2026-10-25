@@ -26,7 +26,10 @@ const Combat = (() => {
     atk2hStab:     atk('Melee_2H_Attack_Stab', /^Throw$/i),
     atkDualChop:   atk('Melee_Dualwield_Attack_Chop', /^Use_Item$/i),
     atkDualSlice:  atk('Melee_Dualwield_Attack_Slice', /^Throw$/i),
-    atkDualStab:   atk('Melee_Dualwield_Attack_Stab', /^Throw$/i)
+    atkDualStab:   atk('Melee_Dualwield_Attack_Stab', /^Throw$/i),
+    // ท่าสำรองของสกิลดาบเมื่อไม่มีท่าฟันดาบจริง — ชื่อคลิปยืนยันแล้วใน assets/characters/Rig_Medium_CombatRanged.glb (ต้องอยู่ใน CFG.anims)
+    magicRaise:    { clip: [/^Ranged_Magic_Raise$/i], lockMove: true },
+    magicShoot:    { clip: [/^Ranged_Magic_Shoot$/i], lockMove: true }
   };
 
   // ---------- อาวุธ (component) ----------
@@ -55,7 +58,8 @@ const Combat = (() => {
         { name: 'ฟันระดับย้อน', clip: 'atkHorizontal', time: 0.66, hitAt: 0.45, gap: 0.14, mult: 1.1, dir: -1 },
         { name: 'จามหนัก',    clip: 'atkChop',       time: 1.05, hitAt: 0.60, gap: 0.50, mult: 2.0, range: 3.9, arc: 170, fx: { reach: 2.1, life: 0.34 } }   // ท่าปิด แรงสุด พักนานแล้ววนใหม่
       ] } },
-      skills: ['light', 'heavy'] }
+      skills: ['light', 'heavy'],
+      special: { z: { type: 'piercingBeam' }, x: { type: 'crescentWave' } } }   // ดาบ: Z = ลำแสงทะลุ + ระเบิด / X = คลื่นเสี้ยวพระจันทร์ (ไม่สตัน)
   };
 
   // ---------- สกิล ----------
@@ -71,7 +75,8 @@ const Combat = (() => {
   let cur = null, comboIdx = 0, comboT = 0, comboId = null, gapT = 0, lockT = 0, queue = null, queueT = 0;
   const nodes = {}, tips = {}, loading = {}, slotEls = [];
   let sp = null, spKeyHandler = null, uiT = 0, disposed = false;   // sp = สกิล Z/X ที่กำลังใช้อยู่
-  const spCd = {}, spCdMax = {};                                    // คูลดาวน์แยกตามอาวุธ+ช่อง เช่น spCd['dagger:z']
+  const spCd = {}, spCdMax = {};
+  let sched = [];                                                   // งานตั้งเวลา (ดาเมจที่ลำแสง/คลื่นไปถึงทีละตัว) — ทำงานต่อแม้ท่าร่ายจบแล้ว                                    // คูลดาวน์แยกตามอาวุธ+ช่อง เช่น spCd['dagger:z']
 
   const isObj = v => v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof RegExp);
   const deepMerge = (a, b) => {                       // ทับค่าทีละชั้น (ไม่ลบค่าที่ไม่ได้ระบุ) — array ถูกแทนทั้งก้อน
@@ -346,11 +351,21 @@ const Combat = (() => {
       animCycle: 0.38, anim: ['atkChop', 'atkHorizontal', 'atkDiagonal', 'atkChop'],   // ท่าที่มีอยู่แล้ว (จามลง/ฟันระดับ/ฟันเฉียง) วนระหว่างรัว
       animFinish: ['atkJumpChop', 'atkChop'], animFinishTime: 0.75, fxRate: 80 }
   };
+  const CAST_DEF = {   // ท่าร่ายของสกิลดาบ: ใช้ท่าฟันดาบจริงถ้าคลิปชื่อตรงมีอยู่ ไม่งั้นใช้ Ranged_Magic_Raise → Ranged_Magic_Shoot
+    melee: { time: 0.55, release: 0.3 },                              // release = วินาทีที่ปล่อยสกิล (จังหวะดาบฟาดจริง)
+    magic: { raiseTime: 0.4, shootTime: 0.5, releaseAt: 0.6 }          // ปล่อยตอนท่า Shoot เล่นไปราว 40%
+  };
+  SPECIAL_DEF.piercingBeam = deepMerge(CAST_DEF, { name: 'Piercing Beam', cooldown: 8, cost: 60,
+    length: 26, width: 1.5, beamSpeed: 120, beamMult: 3, explosion: { radius: 5.5, mult: 4, delay: 0.06 },
+    melee: { anim: ['atkStab', 'atkChop'], time: 0.55, release: 0.3 } });
+  SPECIAL_DEF.crescentWave = deepMerge(CAST_DEF, { name: 'Crescent Wave', cooldown: 12, cost: 100,
+    range: 40, speed: 30, startRadius: 1.2, arcDeg: 180, mult: 5, height: 6.5, knock: { dist: 2.2, dur: 0.28 },
+    melee: { anim: ['atkHorizontal', 'atkDiagonal'], time: 0.62, release: 0.34 } });
   const specialDef = (w, slot) => {
     const o = w && w.special && w.special[slot];
     return o && o.enabled !== false && SPECIAL_DEF[o.type] ? deepMerge(SPECIAL_DEF[o.type], o) : null;
   };
-  const SPECIAL_TYPES = { sonicDash: startSonicDash, slashBarrage: startBarrage };
+  const SPECIAL_TYPES = { sonicDash: startSonicDash, slashBarrage: startBarrage, piercingBeam: startBeam, crescentWave: startCrescent };
 
   const hasFX = () => typeof SkillFX !== 'undefined' && SkillFX;
   const alive = m => !!(m && m.wrap && (!m.phase || m.phase === 'alive') && !(m.hp <= 0) && !m.wrap.isDisposed());
@@ -359,10 +374,11 @@ const Combat = (() => {
     const pw = (ctx.Health && ctx.Health.player && ctx.Health.player.stats && ctx.Health.player.stats.power) || 1;
     return Math.max(1, Math.round(w.stats.damage * mult * pw));
   };
-  function hurt(m, amount, tag) {                       // ดาเมจจริงผ่าน Health.damage เส้นเดียวกับฟันปกติ
+  const later = (delay, fn) => sched.push({ t: Math.max(0, delay), fn });
+  function hurt(m, amount, tag, wid) {                       // ดาเมจจริงผ่าน Health.damage เส้นเดียวกับฟันปกติ
     if (!alive(m) || !ctx.Health) return 0;
-    const dealt = ctx.Health.damage(m, amount, { type: 'player', skill: tag, weapon: wId });
-    if (dealt > 0 && typeof Events !== 'undefined') Events.emit('combat:hit', { mob: m, amount: dealt, skill: tag, weapon: wId });
+    const dealt = ctx.Health.damage(m, amount, { type: 'player', skill: tag, weapon: wid || wId });
+    if (dealt > 0 && typeof Events !== 'undefined') Events.emit('combat:hit', { mob: m, amount: dealt, skill: tag, weapon: wid || wId });
     return dealt;
   }
   function mobAt(m) {                                   // ตำแหน่ง/ความสูงตัวมอน (ไว้วางเอฟเฟกต์ที่กลางลำตัว)
@@ -418,7 +434,7 @@ const Combat = (() => {
   }
   function dispose() {                                  // ฉาก/เกมถูกปิด → ล้างทุกอย่างให้เรียบร้อย
     if (disposed) return; disposed = true;
-    abortSpecial();
+    abortSpecial(); sched = [];
     if (spKeyHandler) removeEventListener('keydown', spKeyHandler);
     if (hasFX()) SkillFX.dispose();
     if (typeof SkillUI !== 'undefined') SkillUI.dispose();
@@ -426,10 +442,15 @@ const Combat = (() => {
 
   function tickSpecials(dt, p) {
     for (const k in spCd) if (spCd[k] > 0) spCd[k] = Math.max(0, spCd[k] - dt);
+    if (sched.length) {
+      sched.forEach(e => { e.t -= dt; });
+      const due = sched.filter(e => e.t <= 0); sched = sched.filter(e => e.t > 0);
+      if (!disposed) due.forEach(e => { try { e.fn(); } catch (err) { console.error('[combat] scheduled', err); } });
+    }
     if (!sp) return;
     if (!p || p.dead || disposed) { abortSpecial(); return; }
     const s = sp;
-    try { s.type === 'z' ? updateSonic(s, dt, p) : updateBarrage(s, dt, p); }
+    try { s.type === 'z' ? updateSonic(s, dt, p) : s.type === 'x' ? updateBarrage(s, dt, p) : updateCast(s, dt, p); }
     catch (e) { console.error('[combat] special update', e); abortSpecial(); }
   }
 
@@ -548,6 +569,84 @@ const Combat = (() => {
       hitSet.forEach(m => hurt(m, dmgOf(s.w, d.finalMult), 'special:x:final'));
     }
     if (s.ft >= d.finisherDelay + d.finisherTail) finishSpecial(s);
+  }
+
+
+  // ---------- สกิลดาบ (ไม่สตัน): ท่าร่าย → ปล่อยสกิลตามจังหวะท่า ----------
+  // เลือกท่าตอนใช้จริง: (1) ท่าฟันดาบที่คลิปชื่อตรง (anim.exact) → (2) Ranged_Magic_Raise → Ranged_Magic_Shoot → (3) ท่าสำรองเดิมของ atk* → (4) ไม่มีท่า (ยังปล่อยสกิลตามเวลา)
+  const castLogged = {};
+  function pickCast(p, d) {
+    const a = p.anim, m = d.melee, g = d.magic;
+    if (a) {
+      const exact = m.anim.find(n => a.exact ? a.exact(n) : false);
+      if (exact) return { mode: 'melee', segs: [{ clip: exact, at: 0, time: m.time }], releaseAt: m.release, end: m.time + 0.15 };
+      if (a.has('magicRaise') && a.has('magicShoot'))
+        return { mode: 'magic', segs: [{ clip: 'magicRaise', at: 0, time: g.raiseTime }, { clip: 'magicShoot', at: g.raiseTime, time: g.shootTime }], releaseAt: g.releaseAt, end: g.raiseTime + g.shootTime + 0.1 };
+      const weak = m.anim.find(n => a.has(n));
+      if (weak) return { mode: 'fallback-atk', segs: [{ clip: weak, at: 0, time: m.time }], releaseAt: m.release, end: m.time + 0.15 };
+    }
+    return { mode: 'none', segs: [], releaseAt: m.release, end: m.time };
+  }
+  function startCast(p, w, d, slot, release) {
+    const c = pickCast(p, d);
+    if (!castLogged[d.type + c.mode]) { castLogged[d.type + c.mode] = 1; console.info('[skill] ' + d.name + ': animation mode = ' + c.mode + (c.segs.length ? ' (' + c.segs.map(x => x.clip).join(' → ') + ')' : '')); }
+    if (cfg.autoAim !== false) {                       // ช่วยเล็ง: หันหามอนใกล้สุดด้านหน้า
+      const t = nearest(p, 14, 120);
+      if (t) faceTo(p, t.wrap.position.x, t.wrap.position.z);
+    }
+    sp = { slot, type: 'cast', d, w, wid: wId, phase: 'cast', t: 0, segs: c.segs, segI: 0, releaseAt: c.releaseAt, end: c.end, released: false, release, mode: c.mode };
+    return true;
+  }
+  function updateCast(s, dt, p) {
+    s.t += dt;
+    while (s.segI < s.segs.length && s.t >= s.segs[s.segI].at) { const g = s.segs[s.segI++]; if (p.anim) p.anim.act(g.clip, { duration: g.time }); }
+    if (!s.released && s.t >= s.releaseAt) { s.released = true; s.release(s, p); }
+    if (s.t >= Math.max(s.end, s.releaseAt + 0.05)) finishSpecial(s);   // ท่าร่ายจบ → ปล่อยให้เดินได้; ดาเมจที่ตั้งเวลาไว้ยังทำงานต่อ
+  }
+  const forward2 = () => { const h = ctx.getHeading(); return { x: Math.sin(h), z: Math.cos(h), h }; };
+
+  // Z: Piercing Beam — ลำแสงตรงไปข้างหน้า ทะลุทุกตัวในแนว ดาเมจครั้งเดียวต่อตัว แล้วระเบิดที่ปลายลำ
+  function startBeam(p, w, d, slot) { return startCast(p, w, d, slot, fireBeam); }
+  function fireBeam(s, p) {
+    const d = s.d, w = s.w, wid = s.wid, pos = p.wrap.position, f = forward2(), L = d.length;
+    const ox = pos.x + f.x * 0.8, oz = pos.z + f.z * 0.8, oy = pos.y + 1.3;
+    const ex = pos.x + f.x * L, ez = pos.z + f.z * L, gy = ctx.heightAt ? ctx.heightAt(ex, ez) : pos.y;
+    if (hasFX()) SkillFX.beam({ x: ox, y: oy, z: oz, yaw: f.h, length: L, speed: d.beamSpeed, width: d.width });
+    for (const m of ctx.mobs) {
+      if (!alive(m)) continue;
+      const rx = m.wrap.position.x - pos.x, rz = m.wrap.position.z - pos.z, along = rx * f.x + rz * f.z, perp = Math.abs(rx * f.z - rz * f.x);
+      if (along < -0.3 || along > L + 0.8 || perp > d.width + 0.7) continue;      // นอกแนวลำแสง
+      later(Math.max(0, along) / d.beamSpeed, () => {
+        hurt(m, dmgOf(w, d.beamMult), 'special:z', wid);
+        if (hasFX() && alive(m)) { const q = mobAt(m); SkillFX.hitSpark(q.x, q.y, q.z, 6); }
+      });
+    }
+    later(L / d.beamSpeed + d.explosion.delay, () => {                              // ระเบิดที่ปลายลำแสง (ดาเมจวงกลม ไม่สตัน ไม่ผลัก)
+      if (hasFX()) SkillFX.explosion(ex, gy, ez, d.explosion.radius);
+      for (const m of ctx.mobs) if (alive(m) && planar(m.wrap.position, { x: ex, z: ez }) <= d.explosion.radius + 0.6) hurt(m, dmgOf(w, d.explosion.mult), 'special:z:explosion', wid);
+    });
+  }
+
+  // X: Crescent Wave — คลื่นเสี้ยวพระจันทร์กวาดครอบ 180° ด้านหน้า พุ่งไกลมาก ดาเมจสูง + ผลักเล็กน้อย (ไม่สตัน)
+  function startCrescent(p, w, d, slot) { return startCast(p, w, d, slot, fireCrescent); }
+  function fireCrescent(s, p) {
+    const d = s.d, w = s.w, wid = s.wid, pos = p.wrap.position, f = forward2();
+    if (hasFX()) SkillFX.crescent({ x: pos.x, y: pos.y, z: pos.z, yaw: f.h, range: d.range, speed: d.speed, startRadius: d.startRadius, height: d.height });
+    const cosHalf = Math.cos(d.arcDeg * Math.PI / 360);
+    for (const m of ctx.mobs) {
+      if (!alive(m)) continue;
+      const rx = m.wrap.position.x - pos.x, rz = m.wrap.position.z - pos.z, dist = Math.hypot(rx, rz);
+      if (dist > d.range + 0.8) continue;
+      if (dist > 0.01 && (rx * f.x + rz * f.z) / dist < cosHalf - 1e-6) continue;   // นอกมุม 180° ด้านหน้า
+      later(Math.max(0, dist - 0.8 - d.startRadius) / d.speed, () => {              // โดนตอนหน้าคลื่นไปถึงตัวมอน
+        if (!alive(m)) return;
+        const dx = m.wrap.position.x - pos.x, dz = m.wrap.position.z - pos.z;
+        if (hurt(m, dmgOf(w, d.mult), 'special:x', wid) > 0 && alive(m)) {
+          ctx.knock && ctx.knock(m, dx, dz, d.knock.dist, d.knock.dur);              // ผลักเล็กน้อยออกจากผู้ใช้ — AI/แอนิเมชันของมอนเล่นต่อตามปกติ
+          if (hasFX()) { const q = mobAt(m); SkillFX.hitSpark(q.x, q.y, q.z, 8); }
+        }
+      });
+    }
   }
 
   return { init, use, update, equip, registerWeapon, animStates: ANIM_STATES,
