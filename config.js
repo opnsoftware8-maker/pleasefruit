@@ -105,22 +105,20 @@ const CFG = {
 const LIGHTING_CONFIG = {
   enabled: true,
 
-  // ลดความสว่างรวมเพื่อไม่ให้สีฟอกขาว
-  brightness: 1.12,
-  debug: false,
+brightness: 1.08,
+debug: false,
 
-  // แสงพระอาทิตย์ตกจากทิศตะวันออก
-  // สมมติว่า +X คือทิศตะวันออกในแผนที่
- sun: {
-  azimuth: 90,
-  elevation: 15,
-  color: [1, 0.72, 0.24],
-  intensity: 2.20,
+sun: {
+  azimuth: -90,
+  elevation: 13,
+  color: [1.0, 0.46, 0.16],
+  intensity: 1.75,
 },
+
 ambient: {
-  intensity: 1.14,
-  sky: [0.90, 0.92, 1],
-  ground: [0.92, 0.78, 0.4],
+  intensity: 0.68,
+  sky: [0.58, 0.64, 0.84],
+  ground: [0.78, 0.42, 0.20],
 },
 
   // เงาทอดยาวและมีรายละเอียด
