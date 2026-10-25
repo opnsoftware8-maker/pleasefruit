@@ -105,7 +105,7 @@ const CFG = {
 const LIGHTING_CONFIG = {
   enabled: true,
 
-brightness: 1.75,
+brightness: 1.12,
 debug: false,
 
 // ท้องฟ้าจากภาพ PNG — ใส่ path ภาพที่ image เพื่อเปิดใช้ (null = ใช้ท้องฟ้าที่โค้ดสร้างเหมือนเดิม)
