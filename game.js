@@ -10,8 +10,25 @@ const Hx = _HP || { init() {}, register() {}, update() {}, damage() {} };
 const engine = new B.Engine($('c'), false, { stencil: false });
 engine.setHardwareScalingLevel(CFG.scale || 1);   // ลดพิกเซลที่ต้องวาด
 const scene = new B.Scene(engine);
-scene.clearColor = new B.Color4(0.44, 0.72, 0.91, 1);
-scene.skipPointerMovePicking = true; scene.autoClearDepthAndStencil = true;
+
+scene.clearColor = new B.Color4(0.38, 0.27, 0.39, 1);
+scene.skipPointerMovePicking = true;
+scene.autoClearDepthAndStencil = true;
+
+// Create the procedural sunset sky.
+try {
+  if (typeof SunsetSky !== 'undefined') {
+    SunsetSky.create(
+      scene,
+      B,
+      typeof LIGHTING_CONFIG !== 'undefined'
+        ? LIGHTING_CONFIG
+        : {}
+    );
+  }
+} catch (err) {
+  console.warn('[sunset-sky] Could not create sky.', err);
+}
 
 // ===== จอ: แนวนอน + เต็มจอ =====
 // ปรับที่ CFG.display ใน config.js:  landscape บังคับแนวนอน / fullscreen 'auto' (เข้าเต็มจอเองตอนแตะครั้งแรก) | 'button' (ปุ่มกด/กด F) | false
