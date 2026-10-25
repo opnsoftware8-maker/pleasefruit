@@ -1,5 +1,6 @@
 // ===== src/combat.js — อาวุธ (component) + สกิล + Hotbar + คอมโบ + เอฟเฟกต์เสี้ยวฟัน =====
 // ต้องใส่ <script src="src/combat.js"></script> ต่อจาก health.js และก่อน game.js
+// สกิลพิเศษ Z/X: ตรรกะทั้งหมดอยู่ท้ายไฟล์นี้ (หัวข้อ "สกิลพิเศษ") — ภาพอยู่ใน src/skill-effects.js, ปุ่มมือถืออยู่ใน src/skill-ui.js
 //
 // อาวุธ 1 ชิ้น = 1 component:  model (โมเดลติดมือ) + stats (ดาเมจ/ระยะ/มุมฟัน/ความไว) + combos (ท่าตีเรียงกัน) + skills
 // ทุกท่าในคอมโบมีจังหวะของตัวเอง (ให้ต่างกันได้):
@@ -42,7 +43,8 @@ const Combat = (() => {
         { name: 'แทง',       clip: 'atkStab',       time: 0.36, hitAt: 0.35, gap: 0.05, mult: 1.2, range: 2.9, arc: 40 },          // ฉับไว ไกลขึ้น แคบ
         { name: 'ฟันเฉียงย้อน', clip: 'atkDiagonal', time: 0.46, hitAt: 0.45, gap: 0.22, mult: 1.1, dir: -1 }                       // พักหายใจก่อนวนกลับท่า 1
       ] } },
-      skills: ['light', 'heavy'] },
+      skills: ['light', 'heavy'],
+      special: { z: { type: 'sonicDash' }, x: { type: 'slashBarrage' } } },   // ช่องสกิลพิเศษ Z / X (ตัวเลขอยู่ใน SPECIAL_DEF ด้านล่าง + CFG.combat.weapons.dagger.special)
     sword: { name: 'Sword', model: grip('weapon/sword_1handed.gltf'),
       stats: { damage: 30, range: 3.6, arc: 150, speed: 1 },
       fx: { color: [1, 0.95, 0.75], life: 0.26, reach: 1.45, base: 0.3 },
@@ -68,6 +70,8 @@ const Combat = (() => {
   let ctx = null, cfg = {}, weapons = null, skills = null, hotbar = [], wId = null;
   let cur = null, comboIdx = 0, comboT = 0, comboId = null, gapT = 0, lockT = 0, queue = null, queueT = 0;
   const nodes = {}, tips = {}, loading = {}, slotEls = [];
+  let sp = null, spKeyHandler = null, uiT = 0, disposed = false;   // sp = สกิล Z/X ที่กำลังใช้อยู่
+  const spCd = {}, spCdMax = {};                                    // คูลดาวน์แยกตามอาวุธ+ช่อง เช่น spCd['dagger:z']
 
   const isObj = v => v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof RegExp);
   const deepMerge = (a, b) => {                       // ทับค่าทีละชั้น (ไม่ลบค่าที่ไม่ได้ระบุ) — array ถูกแทนทั้งก้อน
@@ -94,6 +98,18 @@ const Combat = (() => {
       b.addEventListener('pointerdown', e => { e.preventDefault(); use('light'); });
       document.body.appendChild(b);
     }
+    spKeyHandler = e => {                                // Z / X = สกิลพิเศษ (ตั้งปุ่มได้ที่ CFG.combat.specialKeys)
+      if (e.repeat) return;
+      const sk = Object.assign({}, SPECIAL_KEYS, cfg.specialKeys || {});
+      for (const slot of SPECIAL_SLOTS) if ((sk[slot] || []).includes(e.code)) { e.preventDefault(); useSpecial(slot); }
+    };
+    addEventListener('keydown', spKeyHandler);
+    try {
+      const sc = ctx.getPlayer() && ctx.getPlayer().wrap.getScene();
+      if (sc && typeof SkillFX !== 'undefined') SkillFX.init(sc, cfg.skillFx);
+      if (sc) sc.onDisposeObservable.add(dispose);
+      if (typeof SkillUI !== 'undefined' && cfg.skillButtons !== false) SkillUI.init({ press: useSpecial, query: specialInfo });
+    } catch (err) { console.warn('[combat] skill fx/ui init', err); }
     buildHotbar();
     equip(cfg.weapon && weapons[cfg.weapon] ? cfg.weapon : hotbar[0] || 'dagger');   // อาวุธเริ่มต้น = ช่อง 1 (dagger)
   }
@@ -127,7 +143,7 @@ const Combat = (() => {
   // ---------- ถืออาวุธ: ติดโมเดลที่มือ (โหลดครั้งเดียว สลับด้วยเปิด/ปิด) ----------
   async function equip(id) {
     const w = weapons[id], p = ctx && ctx.getPlayer();
-    if (!w || !p || p.dead || cur) return false;         // กำลังฟัน/ตาย → สลับไม่ได้
+    if (!w || !p || p.dead || cur || sp) return false;   // กำลังฟัน/ใช้สกิล/ตาย → สลับไม่ได้
     const prev = wId; if (prev === id && nodes[id]) return true;
     wId = id; comboT = 0; comboIdx = 0; gapT = 0; lockT = 0; queue = null; paintHotbar();   // สลับอาวุธ → เริ่มคอมโบใหม่
     if (prev && nodes[prev]) nodes[prev].setEnabled(false);
@@ -232,7 +248,7 @@ const Combat = (() => {
   }
   function use(id) {
     const p = ctx && ctx.getPlayer(); const sk = skills && skills[id], w = weapons && weapons[wId];
-    if (!p || !sk || !w || p.dead || p.dashing || !w.skills.includes(id)) return false;
+    if (!p || !sk || !w || p.dead || p.dashing || sp || !w.skills.includes(id)) return false;   // sp = กำลังใช้สกิล Z/X
     if (lockT > 0) return false;                                       // คูลดาวน์หลังจบคอมโบ (ดาบยาว)
     if (cur) { queue = id; queueT = 0.3; return false; }               // กำลังฟัน → จองคิวไว้
     if (gapT > 0) { queue = id; queueT = gapT + 0.15; return false; }  // อยู่ในระยะคั่น → รอแล้วเริ่มเองเมื่อครบ
@@ -285,6 +301,7 @@ const Combat = (() => {
   function update(dt) {
     if (!ctx) return;
     const p = ctx.getPlayer();
+    tickSpecials(dt, p);
     if (lockT > 0) lockT -= dt;
     if (!cur) { if (comboT > 0) comboT -= dt; if (gapT > 0) gapT -= dt; }
     else if (!p || p.dead || p.dashing) { cur = null; queue = null; comboT = 0; comboIdx = 0; gapT = 0; lockT = 0; }   // ตาย/Dash ตัดท่าฟัน
@@ -301,10 +318,240 @@ const Combat = (() => {
       }
     }
     fxUpdate(dt);
+    if (typeof SkillFX !== 'undefined') SkillFX.update(dt);
+    if (typeof SkillUI !== 'undefined' && (uiT -= dt) <= 0) { uiT = 0.05; SkillUI.update(specialInfo('z'), specialInfo('x')); }
     if (queue) { queueT -= dt; if (queueT <= 0) queue = null; else if (!cur && gapT <= 0 && lockT <= 0) { const q = queue; queue = null; use(q); } }
   }
 
+
+  // =====================================================================
+  // ===== สกิลพิเศษ Z / X — อาวุธละ 2 ช่อง (CFG.combat.weapons.<id>.special.z / .x) =====
+  // combat.js ตัดสินใจทุกอย่าง: คูลดาวน์ / Stamina / เป้าหมาย / ดาเมจ (ผ่าน Health.damage) / ขอสตัน
+  // skill-effects.js เล่นภาพอย่างเดียว, game.js ทำการพุ่งแบบชนของ + สตันมอนจริง
+  // type: 'sonicDash' (Z: พุ่งเป็นเส้น เจอศัตรูตัวแรกแล้วล็อก+สตัน+รัวฟัน) | 'slashBarrage' (X: รัวฟันรอบตัว 3 วิ + เสาพลังจากฟ้า)
+  // =====================================================================
+  const SPECIAL_SLOTS = ['z', 'x'];
+  const SPECIAL_KEYS = { z: ['KeyZ'], x: ['KeyX'] };
+  const SPECIAL_DEF = {
+    sonicDash: { name: 'Sonic Dash', cooldown: 6, cost: 40,
+      dash: { distance: 12, duration: 0.26, iframe: 0.26 },        // ระยะ/เวลาพุ่ง (ใช้ท่า Dodge Forward เดิม + ระบบชนของ game.js)
+      hitRadius: 1.5, aimRange: 14, aimArc: 80, boomSpacing: 1.5,  // hitRadius = รัศมีโดนศัตรูระหว่างทาง / aim* = ช่วยเล็งก่อนพุ่ง / boomSpacing = ระยะห่างวงแหวนเสียงแตก
+      barrage: { duration: 0.75, tickInterval: 0.125, tickMult: 0.8, stun: 0.75,   // ล็อก+สตัน 0.75 วิ เป๊ะ, ดาเมจ = stats.damage × tickMult ต่อทิก
+        animCycle: 0.19, anim: ['atkHorizontal', 'atkDiagonal', 'atkStab'], fxRate: 110 } },
+    slashBarrage: { name: 'Slash Barrage', cooldown: 14, cost: 120,
+      range: 8, maxTargets: 6, duration: 3, hitInterval: 0.25, tickMult: 0.5,   // เป้าหมายในรัศมี range (สูงสุด maxTargets) ได้ดาเมจทุก hitInterval
+      stun: 3.6,                                                                // สตันตั้งแต่เริ่มสกิล (ต้อง ≥ duration + finisherDelay จึงล็อกครบ)
+      finalMult: 6, finalRadius: 5,                                             // ฟินิชเชอร์ 1 ทีดาเมจ = stats.damage × finalMult ทุกตัวในรัศมี finalRadius
+      finisherDelay: 0.4, impactDelay: 0.12, finisherTail: 0.6,                 // หลังจบรัว → รอ finisherDelay วิ แล้วเสาพลังตกใส่ (ภาพตกใช้ impactDelay วิ)
+      animCycle: 0.38, anim: ['atkChop', 'atkHorizontal', 'atkDiagonal', 'atkChop'],   // ท่าที่มีอยู่แล้ว (จามลง/ฟันระดับ/ฟันเฉียง) วนระหว่างรัว
+      animFinish: ['atkJumpChop', 'atkChop'], animFinishTime: 0.75, fxRate: 80 }
+  };
+  const specialDef = (w, slot) => {
+    const o = w && w.special && w.special[slot];
+    return o && o.enabled !== false && SPECIAL_DEF[o.type] ? deepMerge(SPECIAL_DEF[o.type], o) : null;
+  };
+  const SPECIAL_TYPES = { sonicDash: startSonicDash, slashBarrage: startBarrage };
+
+  const hasFX = () => typeof SkillFX !== 'undefined' && SkillFX;
+  const alive = m => !!(m && m.wrap && (!m.phase || m.phase === 'alive') && !(m.hp <= 0) && !m.wrap.isDisposed());
+  const planar = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+  const dmgOf = (w, mult) => {
+    const pw = (ctx.Health && ctx.Health.player && ctx.Health.player.stats && ctx.Health.player.stats.power) || 1;
+    return Math.max(1, Math.round(w.stats.damage * mult * pw));
+  };
+  function hurt(m, amount, tag) {                       // ดาเมจจริงผ่าน Health.damage เส้นเดียวกับฟันปกติ
+    if (!alive(m) || !ctx.Health) return 0;
+    const dealt = ctx.Health.damage(m, amount, { type: 'player', skill: tag, weapon: wId });
+    if (dealt > 0 && typeof Events !== 'undefined') Events.emit('combat:hit', { mob: m, amount: dealt, skill: tag, weapon: wId });
+    return dealt;
+  }
+  function mobAt(m) {                                   // ตำแหน่ง/ความสูงตัวมอน (ไว้วางเอฟเฟกต์ที่กลางลำตัว)
+    const w = m.wrap.position;
+    if (m.fxH === undefined) {
+      try { m.wrap.computeWorldMatrix(true); const bb = m.wrap.getHierarchyBoundingVectors(true); m.fxH = Math.min(6, Math.max(0.8, bb.max.y - bb.min.y)); }
+      catch (e) { m.fxH = 1.5; }
+    }
+    return { x: w.x, y: w.y + m.fxH * 0.55, z: w.z, gy: w.y };
+  }
+  const faceTo = (p, x, z) => ctx.setHeading(Math.atan2(x - p.wrap.position.x, z - p.wrap.position.z));
+  function playClip(p, list, dur) {                     // เล่นท่าที่มีอยู่จริงตัวแรกในลิสต์ (ชื่อ state จาก ANIM_STATES ไม่ได้แต่งใหม่)
+    const a = p && p.anim; if (!a) return;
+    const c = list.find(n => a.has(n)); if (c) a.act(c, { duration: dur });
+  }
+  const cancelNormal = () => { cur = null; queue = null; gapT = 0; comboT = 0; comboIdx = 0; lockT = 0; };   // สกิลพิเศษตัดท่าฟันปกติทันที
+
+  function specialInfo(slot) {                          // ให้ปุ่มบนจอ (skill-ui.js) อ่านสถานะ
+    const w = weapons && weapons[wId], d = specialDef(w, slot), key = slot.toUpperCase();
+    if (!d) return { key, empty: true };
+    const k = wId + ':' + slot, st = ctx && ctx.Stamina && ctx.Stamina.state;
+    return { key, empty: false, name: d.name, cd: spCd[k] || 0, cdMax: spCdMax[k] || d.cooldown || 1, cost: d.cost || 0,
+      enough: !st || st.value >= (d.cost || 0), active: !!(sp && sp.slot === slot), busy: !!sp };
+  }
+
+  function useSpecial(slot) {
+    const p = ctx && ctx.getPlayer(), w = weapons && weapons[wId];
+    if (!p || !w || p.dead || sp || p.dashing || disposed) return false;
+    const d = specialDef(w, slot); if (!d || !SPECIAL_TYPES[d.type]) return false;
+    const key = wId + ':' + slot; if ((spCd[key] || 0) > 0) return false;        // คูลดาวน์
+    if (ctx.Stamina && !ctx.Stamina.spend(d.cost || 0)) return false;           // Stamina ไม่พอ (แถบกะพริบแดง) — หักครั้งเดียวที่นี่ที่เดียว
+    cancelNormal();
+    let ok = false;
+    try { ok = SPECIAL_TYPES[d.type](p, w, d, slot); } catch (e) { console.error('[combat] special', e); abortSpecial(); }
+    if (!ok) { if (ctx.Stamina) ctx.Stamina.add(d.cost || 0); return false; }    // เริ่มไม่ได้ → คืน Stamina
+    spCd[key] = spCdMax[key] = d.cooldown || 0;
+    if (typeof Events !== 'undefined') Events.emit('skill:used', { slot, type: d.type, weapon: wId });
+    return true;
+  }
+
+  function finishSpecial(s) {
+    if (sp !== s) return;
+    sp = null;
+    if (typeof Events !== 'undefined') Events.emit('skill:ended', { slot: s.slot, type: s.d.type, weapon: s.wid });
+  }
+  function abortSpecial() {                             // ตาย/ถูกตัด/ปิดฉาก → ปล่อยสตันทุกตัว ล้างเอฟเฟกต์
+    const s = sp; if (!s) return; sp = null;
+    if (s.phase === 'dash' && ctx.cancelDash) ctx.cancelDash();
+    const list = s.targets || (s.hit ? [s.hit] : []);
+    list.forEach(m => { try { ctx.unstun && ctx.unstun(m); } catch (e) {} });
+    if (s.fxh) s.fxh.cancel();
+    if (hasFX()) SkillFX.cancelAll();
+  }
+  function dispose() {                                  // ฉาก/เกมถูกปิด → ล้างทุกอย่างให้เรียบร้อย
+    if (disposed) return; disposed = true;
+    abortSpecial();
+    if (spKeyHandler) removeEventListener('keydown', spKeyHandler);
+    if (hasFX()) SkillFX.dispose();
+    if (typeof SkillUI !== 'undefined') SkillUI.dispose();
+  }
+
+  function tickSpecials(dt, p) {
+    for (const k in spCd) if (spCd[k] > 0) spCd[k] = Math.max(0, spCd[k] - dt);
+    if (!sp) return;
+    if (!p || p.dead || disposed) { abortSpecial(); return; }
+    const s = sp;
+    try { s.type === 'z' ? updateSonic(s, dt, p) : updateBarrage(s, dt, p); }
+    catch (e) { console.error('[combat] special update', e); abortSpecial(); }
+  }
+
+  // ---------- Z: Forward Sonic Dash ----------
+  function segCircle(x0, z0, x1, z1, cx, cz, r) {       // จุดแรก (0–1) ที่เส้นทางก้าวนี้ตัดวงกลมศัตรู — 0 = เริ่มอยู่ในวงแล้ว, null = ไม่โดน
+    const dx = x1 - x0, dz = z1 - z0, fx_ = x0 - cx, fz_ = z0 - cz, c = fx_ * fx_ + fz_ * fz_ - r * r;
+    if (c <= 0) return 0;
+    const a = dx * dx + dz * dz; if (a < 1e-9) return null;
+    const b = 2 * (fx_ * dx + fz_ * dz), disc = b * b - 4 * a * c; if (disc < 0) return null;
+    const t = (-b - Math.sqrt(disc)) / (2 * a);
+    return t >= 0 && t <= 1 ? t : null;
+  }
+  function startSonicDash(p, w, d) {
+    if (cfg.autoAim !== false) {                        // ช่วยเล็ง: หันหามอนใกล้สุดข้างหน้าก่อนพุ่ง
+      const t = nearest(p, d.aimRange, d.aimArc);
+      if (t) faceTo(p, t.wrap.position.x, t.wrap.position.z);
+    }
+    const h = ctx.getHeading(), s = { slot: 'z', type: 'z', d, w, wid: wId, phase: 'dash', t: 0, hit: null, dx: Math.sin(h), dz: Math.cos(h), travel: 0, nextBoom: 0, ticks: 0 };
+    sp = s;
+    const ok = ctx.skillDash({ distance: d.dash.distance, duration: d.dash.duration, iframe: d.dash.iframe,
+      onStep: (x0, z0, x1, z1) => sonicStep(s, p, x0, z0, x1, z1), onEnd: () => sonicDashEnd(s, p) });
+    if (!ok) { sp = null; return false; }
+    return true;
+  }
+  function sonicStep(s, p, x0, z0, x1, z1) {
+    if (sp !== s || s.hit) return;
+    const d = s.d, y = p.wrap.position.y;
+    s.travel += Math.hypot(x1 - x0, z1 - z0);
+    if (hasFX()) while (s.travel >= s.nextBoom) { SkillFX.dashBoom(x1, y, z1, s.dx, s.dz, s.nextBoom === 0 ? 1.25 : 1); s.nextBoom += d.boomSpacing; }
+    let best = null, bt = 2;                            // เช็กตลอดเส้นทางของก้าวนี้ (ไม่ใช่แค่จุดสุดท้าย) เอาศัตรูที่ถึงก่อน
+    for (const m of ctx.mobs) {
+      if (!alive(m)) continue;
+      const t = segCircle(x0, z0, x1, z1, m.wrap.position.x, m.wrap.position.z, d.hitRadius);
+      if (t !== null && t < bt) { bt = t; best = m; }
+    }
+    if (best) { s.hit = best; if (ctx.cancelDash) ctx.cancelDash(); }   // หยุดพุ่งที่ศัตรู → game.js เรียก onEnd ต่อ
+  }
+  function sonicDashEnd(s, p) {
+    if (sp !== s || s.phase !== 'dash') return;
+    const m = s.hit;
+    if (!m || !alive(m)) { finishSpecial(s); return; }  // ไม่โดนใคร → จบการพุ่งปกติ
+    const b = s.d.barrage, q = mobAt(m);
+    s.phase = 'lock'; s.t = 0; s.ticks = 0; s.maxTicks = Math.floor(b.duration / b.tickInterval + 1e-6); s.animT = 0; s.animI = 0; s.targets = [m];
+    faceTo(p, q.x, q.z);
+    ctx.stun && ctx.stun(m, b.stun);                    // ล็อก+สตัน 0.75 วิ (game.js หยุดมอนจริง)
+    if (hasFX()) {
+      s.fxh = SkillFX.barrage({ x: q.x, y: q.y, z: q.z, duration: b.duration, rate: b.fxRate, radius: 0.9, lenMin: 3.5, lenMax: 8, flare: 1.0 });
+      SkillFX.lockRing(q.x, q.gy + 0.08, q.z, b.duration, 3.2);
+      SkillFX.hitSpark(q.x, q.y, q.z, 10);
+    }
+  }
+  function updateSonic(s, dt, p) {
+    s.t += dt;
+    if (s.phase === 'dash') { if (s.t > s.d.dash.duration + 0.6) abortSpecial(); return; }   // กันค้าง: พุ่งไม่จบตามเวลา
+    const b = s.d.barrage, m = s.hit;
+    if (!alive(m)) { endLock(s); return; }              // เป้าตายระหว่างรัว
+    if ((s.animT -= dt) <= 0) { s.animT = b.animCycle; playClip(p, [b.anim[s.animI++ % b.anim.length]], b.animCycle); }
+    const due = Math.min(Math.floor(s.t / b.tickInterval + 1e-6), s.maxTicks);
+    while (s.ticks < due && alive(m)) {
+      s.ticks++; hurt(m, dmgOf(s.w, b.tickMult), 'special:z');
+      if (hasFX()) { const q = mobAt(m); SkillFX.hitSpark(q.x, q.y, q.z, 3); }
+    }
+    if (!alive(m) || s.t >= b.duration - 1e-6) endLock(s);
+  }
+  function endLock(s) {
+    if (sp !== s) return;
+    ctx.unstun && s.hit && ctx.unstun(s.hit);           // ครบ 0.75 วิ → ปล่อยสตัน แล้วศัตรูเดินต่อ
+    if (s.fxh) s.fxh.stop();                            // เอฟเฟกต์ค่อยๆ จางออก
+    finishSpecial(s);
+  }
+
+  // ---------- X: Three-Second Slash Barrage ----------
+  function startBarrage(p, w, d) {
+    const pos = p.wrap.position;
+    const targets = ctx.mobs.filter(m => alive(m) && m.wrap.isEnabled() && planar(m.wrap.position, pos) <= d.range + 0.8)
+      .sort((a, b) => planar(a.wrap.position, pos) - planar(b.wrap.position, pos)).slice(0, d.maxTargets);
+    const pr = targets[0];
+    let c;
+    if (pr) { const q = mobAt(pr); c = { x: q.x, y: q.y, z: q.z, gy: q.gy }; }
+    else { const [fx_, fz_] = fwd(), R = Math.min(4, d.range * 0.5), x = pos.x + fx_ * R, z = pos.z + fz_ * R, gy = ctx.heightAt ? ctx.heightAt(x, z) : pos.y; c = { x, y: gy + 1.1, z, gy }; }   // ไม่มีเป้า → ฟาดลงพื้นตรงหน้า (ไม่มีดาเมจ)
+    faceTo(p, c.x, c.z);
+    targets.forEach(m => ctx.stun && ctx.stun(m, d.stun));
+    const s = { slot: 'x', type: 'x', d, w, wid: wId, phase: 'barrage', t: 0, ticks: 0, maxTicks: Math.floor(d.duration / d.hitInterval + 1e-6), targets, c, animT: 0, animI: 0, ft: 0, fxSent: false, dealt: false };
+    sp = s;
+    if (hasFX()) {
+      s.fxh = SkillFX.barrage({ x: c.x, y: c.y, z: c.z, duration: d.duration, rate: d.fxRate, radius: 1.3, lenMin: 5, lenMax: 11, flare: 1.5 });
+      targets.forEach(m => { const q = mobAt(m); SkillFX.lockRing(q.x, q.gy + 0.08, q.z, d.duration + d.finisherDelay, 3.4); });
+    }
+    return true;
+  }
+  function updateBarrage(s, dt, p) {
+    const d = s.d; s.t += dt;
+    if (s.phase === 'barrage') {
+      if ((s.animT -= dt) <= 0) { s.animT = d.animCycle; faceTo(p, s.c.x, s.c.z); playClip(p, [d.anim[s.animI++ % d.anim.length]], d.animCycle); }
+      const due = Math.min(Math.floor(s.t / d.hitInterval + 1e-6), s.maxTicks);
+      while (s.ticks < due) {
+        s.ticks++;
+        for (const m of s.targets) {
+          if (!alive(m)) continue;
+          hurt(m, dmgOf(s.w, d.tickMult), 'special:x');
+          if (hasFX()) { const q = mobAt(m); SkillFX.hitSpark(q.x, q.y, q.z, 2); }
+        }
+      }
+      if (s.t >= d.duration - 1e-6) { s.phase = 'finisher'; s.ft = 0; if (s.fxh) s.fxh.stop(); playClip(p, d.animFinish, d.animFinishTime); }
+      return;
+    }
+    s.ft += dt;                                          // ฟินิชเชอร์: เสาพลังตกจากฟ้า → ดาเมจครั้งเดียว
+    if (!s.fxSent && s.ft >= Math.max(0, d.finisherDelay - d.impactDelay)) {
+      s.fxSent = true;
+      if (hasFX()) SkillFX.finisher({ x: s.c.x, y: s.c.gy, z: s.c.z }, { impactDelay: d.impactDelay, radius: 1 });
+    }
+    if (!s.dealt && s.ft >= d.finisherDelay) {
+      s.dealt = true;
+      const hitSet = new Set(s.targets.filter(alive));
+      for (const m of ctx.mobs) if (alive(m) && planar(m.wrap.position, s.c) <= d.finalRadius) hitSet.add(m);
+      hitSet.forEach(m => hurt(m, dmgOf(s.w, d.finalMult), 'special:x:final'));
+    }
+    if (s.ft >= d.finisherDelay + d.finisherTail) finishSpecial(s);
+  }
+
   return { init, use, update, equip, registerWeapon, animStates: ANIM_STATES,
+    useSpecial, specialInfo, dispose, get specialActive() { return !!sp; },   // specialActive: game.js ใช้ล็อกการเดิน/Dash ระหว่างสกิล
     get weapon() { return weapons && weapons[wId]; }, get weaponId() { return wId; },
     get stats() { return weapons && weapons[wId] && weapons[wId].stats; },
     get weapons() { return weapons; }, get skills() { return skills; } };
