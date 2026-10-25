@@ -8,7 +8,7 @@ const CFG = {
   lv: { ',': 0, g: 3, h: 6, A: 6, p: 0 },
   step: 3,
   cam: { fov: Math.PI / 2, pitch: 34, dist: 14 },
-  scale: 1.25,
+  scale: 1,
   fenceStep: 1, // เติมรั้วทุกช่วง ไม่เว้นช่อง
   farFreeze: 90,
   pathW: 5,
