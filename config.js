@@ -7,7 +7,7 @@ const CFG = {
   cell: 4,
   lv: { ',': 0, g: 3, h: 6, A: 6, p: 0 },
   step: 3,
-  cam: { fov: Math.PI / 2, pitch: 45, dist: 19 },
+  cam: { fov: Math.PI / 2, pitch: 39, dist: 14 },
   scale: 1,
   fenceStep: 1, // เติมรั้วทุกช่วง ไม่เว้นช่อง
   farFreeze: 90,
@@ -47,7 +47,7 @@ const CFG = {
   // อาวุธแต่ละชิ้นเป็น component: model (ไฟล์ใน assets/weapon/) + stats + skills — ทับเฉพาะค่าที่อยากเปลี่ยนได้
   combat: {
     weapon: 'dagger',                 // อาวุธเริ่มต้น
-    hotbar: ['dagger', 'sword'],      // ช่อง 1, 2, ... (กดเลขบนคีย์บอร์ดหรือแตะที่ช่องเพื่อเปลี่ยน)
+    hotbar: ['dagger', 'sword', 'dualAxe'],      // ช่อง 1, 2, ... (กดเลขบนคีย์บอร์ดหรือแตะที่ช่องเพื่อเปลี่ยน)
     autoAim: true,                    // หันหามอนที่ใกล้ที่สุดตอนฟัน
     button: true,                     // ปุ่ม ATTACK บนจอ
     keys: { light: ['KeyJ'], heavy: ['KeyK'] },   // J = ฟันเบา (คอมโบตามอาวุธ), K = ฟันหนัก
@@ -110,6 +110,38 @@ const CFG = {
             height: 6.5,                                             // ความสูงคลื่นเสี้ยวพระจันทร์
             // melee: { anim: ['atkHorizontal', 'atkDiagonal'], time: 0.62, release: 0.34 },
             // magic: { raiseTime: 0.4, shootTime: 0.5, releaseAt: 0.6 },
+          },
+        },
+      },
+      // ---------- ขวานคู่ (หนัก ช้า กว้าง) ----------
+      // ถือ 2 เล่ม: models[0] = มือขวา, models[1] = มือซ้าย — ปรับ pos [x,y,z] / rot [x,y,z เรเดียน] / scale ของแต่ละเล่มได้อิสระ
+      // slot = ชื่อจุดจับบนตัวละคร (ขวา 'handslot.r' / ซ้าย 'handslot.l') ถ้าชื่อไม่ตรง ระบบจะลองหาชื่อที่ใกล้เคียงให้ และดูรายชื่อจริงใน console: [anims] จุดจับมือที่พบ
+      dualAxe: {
+        models: [
+          { path: 'weapon/axe_1handed.gltf', slot: 'handslot.r', pos: [0, 0, 0], rot: [0, 0, 0], scale: 1 },
+          { path: 'weapon/axe_1handed.gltf', slot: 'handslot.l', pos: [0, 0, 0], rot: [0, 0, 0], scale: 1 },   // ถ้าขวานซ้ายหันผิดด้าน ลอง rot: [0, Math.PI, 0] หรือ [0, 0, Math.PI]
+        ],
+        // stats: { damage: 42, range: 4, arc: 150, speed: 1 },      // ช้า/หนักมาจากเวลาของแต่ละท่าในคอมโบ (ดู combos ใน src/combat.js: 0.78 / 0.8 / 1.2 วิ, ตัวคูณดาเมจ 1.0 / 1.25 / 2.3)
+        // fx: { color: [0.9, 0.95, 1] },
+
+        special: {
+          z: { type: 'stormCyclone', name: 'Cyclone Storm',
+            cooldown: 18, cost: 85,
+            lunge: { distance: 3.5, duration: 0.3 },                 // พุ่งหมุนสั้นๆ ก่อนปล่อยพายุ (ระบบพุ่งชนของเดิม)
+            radius: 9, duration: 3,                                  // รัศมีพายุ / เวลาที่ทำดาเมจ
+            tickInterval: 0.25, tickMult: 0.6, initialMult: 3,       // ดาเมจทุก 0.25 วิ = damage × 0.6, แรงกระแทกแรก = damage × 3
+            stun: true, stunPad: 0.15,                               // สตันเฉพาะช่วงพายุ (ต่ออายุทีละทิก; ออกนอกพายุ/จบ/ผู้เล่นตาย = ปล่อยทันที)
+            collapse: 1.0, shrinkStart: 0.7, shrinkTo: 0.45,         // ยุบตัว: 70% แรกเต็มรัศมี → หดเหลือ 45% → ยุบเข้าแกนใน 1 วิ
+            centerDist: 7, maxCenter: 12,                            // ศูนย์กลางพายุอยู่ข้างหน้า 7 หน่วย (หรือที่ศัตรูใกล้สุดข้างหน้า ไม่เกิน 12)
+            // anim: ['atk2hSpin', 'atk2hSpinning', 'atkDualSlice', 'atkHorizontal'], spin: 'auto',
+          },
+          x: { type: 'radialBurst', name: 'Slash Burst',
+            cooldown: 15, cost: 80,
+            crouchTime: 0.55, squash: 0.14,                          // ช่วงย่อตัว (ท่า Crouching + บีบตัวลง 14%)
+            radius: 13, centerOffset: 3, rearLimit: 4,               // รัศมีระเบิด 13 รอบจุดข้างหน้า 3 หน่วย; ด้านหลังตัวเกิน 4 ไม่โดน
+            mult: 5.5,                                               // ดาเมจครั้งเดียว = damage × 5.5 ต่อมอน
+            knock: { dist: 7, dur: 0.4 },                            // ผลักแรงออกจากศูนย์กลาง (ไม่สตัน)
+            // anim: { release: ['atk2hChop', 'atkDualChop', 'atkJumpChop', 'atkChop'] },
           },
         },
       },

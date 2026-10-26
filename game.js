@@ -35,57 +35,14 @@ try {
 const DSP = Object.assign({ landscape: true, fullscreen: 'auto', lockOrientation: true, button: true }, CFG.display || {});
 const Display = (() => {
   const root = document.documentElement, api = { blocked: false };
-  // แคนวาสเต็มหน้าต่าง ไม่เลื่อน ไม่ซูม — แก้ปัญหา Safari ซูมเข้าด้วย inset:0 และ 100% แทน 100vw
+  // แคนวาสเต็มหน้าต่าง ไม่เลื่อน ไม่ซูม (ใช้ dvh กันแถบ URL บนมือถือบังจอ)
   const st = document.createElement('style');
-  st.textContent = 'html,body{margin:0;padding:0;position:fixed;inset:0;width:100%;height:100%;overflow:hidden;background:#000;overscroll-behavior:none;-webkit-overscroll-behavior:none;touch-action:none;-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-user-select:none;user-select:none}'
-    + '#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}';
+  st.textContent = 'html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;overscroll-behavior:none;touch-action:none}'
+    + '#c{position:fixed;left:0;top:0;width:100vw;height:100vh;height:100dvh;display:block;touch-action:none;outline:none}';
   document.head.appendChild(st);
   const meta = (n, c) => { let m = document.querySelector('meta[name="' + n + '"]'); if (!m) { m = document.createElement('meta'); m.name = n; document.head.appendChild(m); } m.content = c; };
-  meta('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover');
-  meta('mobile-web-app-capable', 'yes'); meta('apple-mobile-web-app-capable', 'yes'); meta('apple-mobile-web-app-status-bar-style', 'black-translucent'); meta('theme-color', '#000000');
-
-  // ป้องกัน Safari WebKit Gesture Zoom (Pinch zoom เมื่อแตะสองนิ้ว เช่น ควบคุมจอย + ฟัน)
-  ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => {
-    document.addEventListener(ev, e => {
-      e.preventDefault();
-    }, { passive: false });
-  });
-
-  // ป้องกัน Safari Double-Tap to Zoom (แตะปุ่มหรือจอรัวๆ แล้วซูม)
-  let lastTouchEnd = 0;
-  document.addEventListener('touchend', e => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) {
-      e.preventDefault();
-    }
-    lastTouchEnd = now;
-  }, { passive: false });
-
-  // ป้องกัน Double Click Zoom บน Safari iPad / Mac
-  document.addEventListener('dblclick', e => {
-    e.preventDefault();
-  }, { passive: false });
-
-  // ป้องกัน Trackpad Pinch Zoom บน macOS Safari
-  document.addEventListener('wheel', e => {
-    if (e.ctrlKey) e.preventDefault();
-  }, { passive: false });
-
-  // ป้องกันหน้าต่างหลุดตำแหน่งเมื่อเลื่อนใน Safari
-  window.addEventListener('scroll', () => {
-    if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
-  });
-
-  // ป้องกัน Canvas ไม่ให้ Safari เริ่ม pinch หรือ double-tap zoom
-  const canvasEl = $('c');
-  if (canvasEl) {
-    canvasEl.addEventListener('touchstart', e => {
-      if (e.target === canvasEl) e.preventDefault();
-    }, { passive: false });
-    canvasEl.addEventListener('touchmove', e => {
-      if (e.target === canvasEl) e.preventDefault();
-    }, { passive: false });
-  }
+  meta('viewport', 'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover');
+  meta('mobile-web-app-capable', 'yes'); meta('apple-mobile-web-app-capable', 'yes'); meta('theme-color', '#000000');   // เพิ่มลงหน้าโฮมแล้วเปิดเต็มจอได้ (iPhone)
 
   const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
   const canFs = !!(root.requestFullscreen || root.webkitRequestFullscreen);
@@ -121,7 +78,6 @@ const Display = (() => {
 
   function layout() {
     engine.resize();
-    if (window.scrollTo) window.scrollTo(0, 0);
     if (btn) btn.textContent = fsEl() ? '✕' : '⛶';
     api.blocked = !!(DSP.landscape && coarse && innerHeight > innerWidth);
     ov.style.display = api.blocked ? 'flex' : 'none';
@@ -496,6 +452,8 @@ function setupAnims(root, out) {
   };
   out.anim = api;
   out.getSlot = n => map[n] || null;   // จุดจับของ เช่น 'handslot.r' (ใช้ติดอาวุธ)
+  out.findSlot = rx => { const k = Object.keys(map).find(n => rx.test(n)); return k ? map[k] : null; };   // หาจุดจับด้วย regex (ขวานคู่: ใช้เมื่อชื่อ 'handslot.l' ไม่ตรง)
+  console.info('[anims] จุดจับมือที่พบบนตัวละคร:', Object.keys(map).filter(n => /hand|slot/i.test(n)));   // ไว้ตรวจว่า handslot.l / handslot.r มีจริง
   out.dash = api.dash;
   // รองรับโค้ดเดิม/health.js ที่เรียก player.play('idle'|'move'|ชื่อ state ใดก็ได้)
   out.play = k => { if (k === 'move') return api.loco('walk'); const st = states[k]; return st && st.loop ? api.loco(k) : api.act(k); };
@@ -567,10 +525,10 @@ function joyMove(e) {
   const l = Math.hypot(dx, dy); if (l > R) { dx *= R / l; dy *= R / l; }
   kn.style.transform = `translate(${dx}px,${dy}px)`; joy.x = dx / R; joy.y = -dy / R;
 }
-jz.addEventListener('pointerdown', e => { e.preventDefault(); jid = e.pointerId; jz.setPointerCapture(jid); joyMove(e); });
-jz.addEventListener('pointermove', e => { if (e.pointerId === jid) { e.preventDefault(); joyMove(e); } });
+jz.addEventListener('pointerdown', e => { jid = e.pointerId; jz.setPointerCapture(jid); joyMove(e); });
+jz.addEventListener('pointermove', e => { if (e.pointerId === jid) joyMove(e); });
 ['pointerup', 'pointercancel'].forEach(t => jz.addEventListener(t, e => {
-  if (e.pointerId === jid) { e.preventDefault(); jid = null; joy.x = joy.y = 0; kn.style.transform = ''; }
+  if (e.pointerId === jid) { jid = null; joy.x = joy.y = 0; kn.style.transform = ''; }
 }));
 addEventListener('keydown', e => keys[e.key.toLowerCase()] = 1);
 addEventListener('keyup', e => keys[e.key.toLowerCase()] = 0);
