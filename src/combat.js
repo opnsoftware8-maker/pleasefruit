@@ -29,11 +29,12 @@ const Combat = (() => {
     atkDualStab:   atk('Melee_Dualwield_Attack_Stab', /^Throw$/i),
     // ท่าสำรองของสกิลดาบเมื่อไม่มีท่าฟันดาบจริง — ชื่อคลิปยืนยันแล้วใน assets/characters/Rig_Medium_CombatRanged.glb (ต้องอยู่ใน CFG.anims)
     magicRaise:    { clip: [/^Ranged_Magic_Raise$/i], lockMove: true },
-    magicShoot:    { clip: [/^Ranged_Magic_Shoot$/i], lockMove: true }
+    magicShoot:    { clip: [/^Ranged_Magic_Shoot$/i], lockMove: true },
+    crouch:        { clip: [/^Crouching$/i], loop: true }   // ท่าย่อ — ชื่อคลิปยืนยันแล้วใน Rig_Medium_MovementAdvanced.glb (สกิล X ของขวานคู่)
   };
 
   // ---------- อาวุธ (component) ----------
-  const grip = path => ({ path, slot: 'handslot.r', pos: [0, 0, 0], rot: [0, 0, 0], scale: 1 });
+  const grip = (path, slot) => ({ path, slot: slot || 'handslot.r', pos: [0, 0, 0], rot: [0, 0, 0], scale: 1 });   // slot: จุดจับบนตัวละคร (ซ้าย = 'handslot.l')
   // ลำดับท่าของทั้งสองอาวุธ: ฟันระดับ → จามลง → แทง → … แล้ววนกลับท่าแรก (loop) — แต่ละท่ามีจังหวะ (เวลา/หน่วงก่อนโดน/ระยะคั่น) ไม่เหมือนกัน
   //   เร็ว-หนัก-ฉับ-พัก : ฟันระดับเร็ว → จามลงง้างช้าแต่แรง → แทงฉับไว ไกล → พักหายใจก่อนวนใหม่
   const WEAPONS = {
@@ -59,7 +60,25 @@ const Combat = (() => {
         { name: 'จามหนัก',    clip: 'atkChop',       time: 1.05, hitAt: 0.60, gap: 0.50, mult: 2.0, range: 3.9, arc: 170, fx: { reach: 2.1, life: 0.34 } }   // ท่าปิด แรงสุด พักนานแล้ววนใหม่
       ] } },
       skills: ['light', 'heavy'],
-      special: { z: { type: 'piercingBeam' }, x: { type: 'crescentWave' } } }   // ดาบ: Z = ลำแสงทะลุ + ระเบิด / X = คลื่นเสี้ยวพระจันทร์ (ไม่สตัน)
+      special: { z: { type: 'piercingBeam' }, x: { type: 'crescentWave' } } },   // ดาบ: Z = ลำแสงทะลุ + ระเบิด / X = คลื่นเสี้ยวพระจันทร์ (ไม่สตัน)
+    // ขวานคู่ (หนัก ช้า กว้าง): ถือ 2 เล่ม (models[0] = มือขวา, models[1] = มือซ้าย) — ปรับ pos/rot/scale/slot ที่ CFG.combat.weapons.dualAxe.models
+    dualAxe: { name: 'Dual Axe',
+      models: [grip('weapon/axe_1handed.gltf', 'handslot.r'), grip('weapon/axe_1handed.gltf', 'handslot.l')],
+      stats: { damage: 42, range: 4, arc: 150, speed: 1 },
+      fx: { color: [0.9, 0.95, 1], life: 0.32, reach: 1.6, base: 0.3 },
+      combos: { light: { loop: true, window: 0.8, steps: [
+        // clips = ลิสต์ท่าที่ลอง: เลือกตัวที่ชื่อคลิปตรงจริง (anim.exact) ก่อน แล้วค่อยท่าสำรอง — ไม่อ้างคลิปที่ไม่มี
+        { name: 'ขวากวาดขวา', clip: 'atkHorizontal', clips: ['atkHorizontal', 'atkDiagonal', 'atkDualSlice'],
+          time: 0.78, hitAt: 0.46, gap: 0.14, mult: 1.0, dir: 1, hand: 'r', range: 4, arc: 150, impact: 3, fx: { reach: 1.9, life: 0.32 } },
+        // ท่า 2: เล่นคลิปท่าเฉียงแบบ "กลับด้านซ้าย-ขวา" (mirror) ให้แขนอีกข้างฟาดสวนทิศ — คลิปที่มีเป็นท่ามือขวา จึงสะท้อนทั้งตัวตอนท่านี้
+        { name: 'ซ้ายสวน', clip: 'atkDiagonal', clips: ['atkDiagonal', 'atkHorizontal', 'atkDualSlice'], mirror: true,
+          time: 0.8, hitAt: 0.46, gap: 0.16, mult: 1.25, dir: -1, hand: 'l', range: 4, arc: 160, impact: 3, fx: { reach: 1.9, life: 0.32 } },
+        // ท่า 3: ยกขวาน 2 เล่มฟาดลงพร้อมกัน — ช้า/แรงสุด กระแทกพื้นเป็นวงกว้าง แล้วพักก่อนวนใหม่
+        { name: 'ฟาดสองมือ', clip: 'atkChop', clips: ['atk2hChop', 'atkDualChop', 'atkJumpChop', 'atkChop'],
+          time: 1.2, hitAt: 0.58, gap: 0.7, mult: 2.3, dir: 1, hand: 'both', range: 4.6, arc: 200, impact: 6, slam: true, fx: { reach: 2.2, life: 0.4 } }
+      ] } },
+      skills: ['light', 'heavy'],
+      special: { z: { type: 'stormCyclone' }, x: { type: 'radialBurst' } } }   // Z = พายุหมุนยักษ์ / X = ย่อตัวแล้วระเบิดเส้นฟันรอบทิศ
   };
 
   // ---------- สกิล ----------
@@ -74,6 +93,8 @@ const Combat = (() => {
   let ctx = null, cfg = {}, weapons = null, skills = null, hotbar = [], wId = null;
   let cur = null, comboIdx = 0, comboT = 0, comboId = null, gapT = 0, lockT = 0, queue = null, queueT = 0;
   const nodes = {}, tips = {}, loading = {}, slotEls = [];
+  const extra = {};                                                // extra[id] = [{ g, tip }] — ขวานคู่: ชิ้นที่ 2 ขึ้นไป (มืออีกข้าง)
+  const pose = { mirror: false, squash: 0, target: 0, dirty: false };   // ท่วงท่า procedural บนตัวผู้เล่น: กลับซ้าย-ขวา (ท่า 2) / ย่อตัว (สกิล X)
   let sp = null, spKeyHandler = null, uiT = 0, disposed = false;   // sp = สกิล Z/X ที่กำลังใช้อยู่
   const spCd = {}, spCdMax = {};
   let sched = [];                                                   // งานตั้งเวลา (ดาเมจที่ลำแสง/คลื่นไปถึงทีละตัว) — ทำงานต่อแม้ท่าร่ายจบแล้ว                                    // คูลดาวน์แยกตามอาวุธ+ช่อง เช่น spCd['dagger:z']
@@ -146,29 +167,45 @@ const Combat = (() => {
   }
 
   // ---------- ถืออาวุธ: ติดโมเดลที่มือ (โหลดครั้งเดียว สลับด้วยเปิด/ปิด) ----------
+  // อาวุธมี model เดียว (ดาบสั้น/ดาบยาว) หรือ models[] หลายชิ้น (ขวานคู่: มือขวา + มือซ้าย) — ทุกชิ้นเปิด/ปิดพร้อมกัน
+  const modelsOf = w => (w.models && w.models.length ? w.models : (w.model ? [w.model] : [])).filter(m => m && m.path);
+  const setWeaponOn = (id, on) => { if (nodes[id]) nodes[id].setEnabled(on); (extra[id] || []).forEach(e => e.g.setEnabled(on)); };
+  function slotFor(p, m) {                                    // ชื่อจุดจับตามที่ตั้งใน config → ไม่เจอก็ลองหาจากชื่อที่ใกล้เคียง (ซ้าย/ขวา)
+    let s = p.getSlot && p.getSlot(m.slot);
+    if (!s && p.findSlot) {
+      const left = /(?:^|[._\-\s])(l|left)$/i.test(m.slot || '');
+      s = p.findSlot(left ? /^hand.?slot.*(?:[._\-]l|left)$/i : /^hand.?slot.*(?:[._\-]r|right)$/i);
+    }
+    return s || null;
+  }
   async function equip(id) {
     const w = weapons[id], p = ctx && ctx.getPlayer();
     if (!w || !p || p.dead || cur || sp) return false;   // กำลังฟัน/ใช้สกิล/ตาย → สลับไม่ได้
     const prev = wId; if (prev === id && nodes[id]) return true;
     wId = id; comboT = 0; comboIdx = 0; gapT = 0; lockT = 0; queue = null; paintHotbar();   // สลับอาวุธ → เริ่มคอมโบใหม่
-    if (prev && nodes[prev]) nodes[prev].setEnabled(false);
+    if (prev && prev !== id) setWeaponOn(prev, false);
     if (typeof Events !== 'undefined') Events.emit('weapon:equipped', { id, weapon: w });
-    if (nodes[id]) { nodes[id].setEnabled(true); return true; }
-    const m = w.model; if (!m || !m.path || loading[id]) return true;   // ไม่มีโมเดล → ฟันได้ แค่ไม่เห็นในมือ
+    if (nodes[id]) { setWeaponOn(id, true); return true; }
+    const list = modelsOf(w); if (!list.length || loading[id]) return true;   // ไม่มีโมเดล → ฟันได้ แค่ไม่เห็นในมือ
     loading[id] = true;
     try {
-      const slot = p.getSlot && p.getSlot(m.slot);
-      if (!slot) { console.warn('[combat] ไม่พบจุดจับ ' + m.slot + ' บนตัวละคร'); return false; }
-      const cont = await ctx.load(m.path); if (!cont) return false;    // โหลดไม่ได้ → game.js แจ้งใน log เอง
-      const inst = cont.instantiateModelsToScene(n => n, false, { doNotInstantiate: true });
-      const root = inst.rootNodes[0];
-      // root ของ glTF มีการหมุนแปลงแกนอยู่แล้ว → ห่อด้วย grip แล้วปรับ pos/rot/scale ที่ grip แทน
-      const T = (typeof BABYLON !== 'undefined' && BABYLON.TransformNode) || root.constructor;
-      const g = new T('grip_' + id, root.getScene());
-      g.parent = slot; g.position.set(...m.pos); g.rotation.set(...m.rot); g.scaling.setAll(m.scale || 1);
-      root.parent = g; root.getChildMeshes().forEach(x => { x.isPickable = false; });
-      tips[id] = findTip(g, root);                                    // จุดปลายอาวุธ (ใช้ลากเอฟเฟกต์ฟันตามปลายดาบจริง)
-      nodes[id] = g; g.setEnabled(wId === id);
+      const parts = [];
+      for (let i = 0; i < list.length; i++) {
+        const m = list[i], slot = slotFor(p, m);
+        if (!slot) { console.warn('[combat] ไม่พบจุดจับ ' + m.slot + ' บนตัวละคร (โมเดลชิ้นที่ ' + (i + 1) + ' ของ ' + id + ')'); continue; }
+        const cont = await ctx.load(m.path); if (!cont) continue;     // โหลดไม่ได้ → game.js แจ้งใน log เอง
+        const inst = cont.instantiateModelsToScene(n => n, false, { doNotInstantiate: true });   // ทุกชิ้นเป็นสำเนาแยก (ขวานซ้าย/ขวาไม่ใช้ร่วมกัน)
+        const root = inst.rootNodes[0];
+        // root ของ glTF มีการหมุนแปลงแกนอยู่แล้ว → ห่อด้วย grip แล้วปรับ pos/rot/scale ที่ grip แทน
+        const T = (typeof BABYLON !== 'undefined' && BABYLON.TransformNode) || root.constructor;
+        const g = new T('grip_' + id + '_' + i, root.getScene());
+        g.parent = slot; g.position.set(...m.pos); g.rotation.set(...m.rot); g.scaling.setAll(m.scale || 1);
+        root.parent = g; root.getChildMeshes().forEach(x => { x.isPickable = false; });
+        parts.push({ g, tip: findTip(g, root) });                    // จุดปลายอาวุธ (ใช้ลากเอฟเฟกต์ฟันตามปลายจริง)
+      }
+      if (!parts.length) return false;
+      nodes[id] = parts[0].g; tips[id] = parts[0].tip; extra[id] = parts.slice(1);
+      setWeaponOn(id, wId === id);                                   // ระหว่างโหลดผู้เล่นอาจสลับอาวุธไปแล้ว
       return true;
     } finally { loading[id] = false; }
   }
@@ -212,10 +249,14 @@ const Combat = (() => {
     const c = o.color || [1, 1, 1]; fx.mat.emissiveColor = new BABYLON.Color3(c[0], c[1], c[2]);
   }
   function fxSample(p, w, st, prog) {                         // เก็บจุดปลาย/โคนของแถบ 1 จุด ณ ตอนนี้
-    const V = BABYLON.Vector3, g = nodes[wId], tip = tips[wId]; let a, b;
-    if (g && tip) {                                           // ตามปลายอาวุธจริง
-      g.computeWorldMatrix(true); const m = g.getWorldMatrix();
-      a = V.TransformCoordinates(tip.scale(fx.reach), m); b = V.TransformCoordinates(tip.scale(fx.base), m);
+    const V = BABYLON.Vector3; let a, b;
+    const all = [{ g: nodes[wId], tip: tips[wId] }].concat(extra[wId] || []);                 // [ขวา, ซ้าย?] — ดาบเดี่ยวมีแค่ตัวแรก
+    const sel = st.hand === 'l' && all[1] ? [all[1]] : st.hand === 'both' && all.length > 1 ? all : [all[0]];
+    const live = sel.filter(x => x.g && x.tip);
+    if (live.length) {                                        // ตามปลายอาวุธจริง (2 มือ = เฉลี่ยปลายขวานทั้งสองเป็นแถบกว้าง)
+      a = new V(0, 0, 0); b = new V(0, 0, 0);
+      live.forEach(x => { x.g.computeWorldMatrix(true); const m = x.g.getWorldMatrix(); a.addInPlace(V.TransformCoordinates(x.tip.scale(fx.reach), m)); b.addInPlace(V.TransformCoordinates(x.tip.scale(fx.base), m)); });
+      a.scaleInPlace(1 / live.length); b.scaleInPlace(1 / live.length);
     } else {                                                  // ไม่มีโมเดล → เสี้ยวสมมติโค้งหน้าตัวละคร
       const arc = (st.arc || w.stats.arc) * Math.PI / 180 * 0.9, R = (st.range || w.stats.range), ang = ctx.getHeading() + (st.dir || 1) * (prog - 0.5) * arc, y = p.wrap.position.y + 1.1;
       a = new V(p.wrap.position.x + Math.sin(ang) * R, y, p.wrap.position.z + Math.cos(ang) * R);
@@ -266,7 +307,10 @@ const Combat = (() => {
       const t = nearest(p, w.stats.range * 1.8, w.stats.arc * 1.5);
       if (t) ctx.setHeading(Math.atan2(t.wrap.position.x - p.wrap.position.x, t.wrap.position.z - p.wrap.position.z));
     }
-    if (p.anim) p.anim.act(st.clip, { duration: time });
+    let clip = st.clip;                                                // st.clips = ลิสต์ท่าที่ลอง: เอาตัวที่คลิปชื่อตรงจริงก่อน → รองลงมาท่าสำรอง → ท่าเดิม
+    if (st.clips && p.anim) clip = st.clips.find(n => p.anim.exact && p.anim.exact(n)) || st.clips.find(n => p.anim.has(n)) || st.clip;
+    pose.mirror = !!(st.mirror && cfg.mirrorLeft !== false);          // ท่า 2 ของขวานคู่: กลับซ้าย-ขวาให้แขนอีกข้างฟาด (ปิดได้ที่ CFG.combat.mirrorLeft = false)
+    if (p.anim) p.anim.act(clip, { duration: time });
     fxStart(w, st);
     cur = { id, sk, w, cb, st, last: n > 1 && step === n - 1, time, hitAt, t: 0, did: false, gap: (st.gap || 0) / spd,
       mult: (sk.dmgMult || 1) * (st.mult || 1) };
@@ -300,6 +344,11 @@ const Combat = (() => {
       if (!inCone(p, m, range, arc)) continue;
       const dealt = ctx.Health ? ctx.Health.damage(m, dmg, { type: 'player', skill: cur.id, weapon: wId }) : 0;
       if (dealt > 0 && typeof Events !== 'undefined') Events.emit('combat:hit', { mob: m, amount: dealt, skill: cur.id, weapon: wId });
+      if (dealt > 0 && st.impact && hasFX() && alive(m)) { const q = mobAt(m); SkillFX.hitSpark(q.x, q.y, q.z, st.impact); }   // ประกายกระแทก (เฉพาะท่าที่ตั้ง impact — ขวานคู่)
+    }
+    if (st.slam && hasFX()) {                                          // ฟาดสองมือ: กระแทกพื้นเป็นวงกว้าง + จอสั่น
+      const f = fwd(), pos = p.wrap.position;
+      SkillFX.slam(pos.x + f[0] * range * 0.5, pos.y, pos.z + f[1] * range * 0.5, range * 1.3, 1);
     }
   }
 
@@ -307,9 +356,10 @@ const Combat = (() => {
     if (!ctx) return;
     const p = ctx.getPlayer();
     tickSpecials(dt, p);
+    applyPose(p, dt);
     if (lockT > 0) lockT -= dt;
     if (!cur) { if (comboT > 0) comboT -= dt; if (gapT > 0) gapT -= dt; }
-    else if (!p || p.dead || p.dashing) { cur = null; queue = null; comboT = 0; comboIdx = 0; gapT = 0; lockT = 0; }   // ตาย/Dash ตัดท่าฟัน
+    else if (!p || p.dead || p.dashing) { cur = null; queue = null; comboT = 0; comboIdx = 0; gapT = 0; lockT = 0; pose.mirror = false; }   // ตาย/Dash ตัดท่าฟัน
     else {
       cur.t += dt;
       const prog = cur.t / cur.time;
@@ -317,7 +367,7 @@ const Combat = (() => {
         fxSample(p, cur.w, cur.st, Math.max(0, Math.min(1, (prog - (cur.hitAt - 0.3)) / 0.55)));
       if (!cur.did && prog >= cur.hitAt) { cur.did = true; strike(); }
       if (cur.t >= cur.time) {
-        const { cb, last, gap } = cur; cur = null;
+        const { cb, last, gap } = cur; cur = null; pose.mirror = false;
         if (last && !cb.loop) { comboT = 0; comboIdx = 0; lockT = cb.recovery || 0; gapT = 0; }   // จบคอมโบ → คูลดาวน์ แล้วเริ่มท่า 1 ใหม่
         else { gapT = gap; comboT = gap + (cb.window || 0); }                                      // ระยะคั่นของท่านี้ + เวลาที่ยังต่อคอมโบได้
       }
@@ -365,7 +415,7 @@ const Combat = (() => {
     const o = w && w.special && w.special[slot];
     return o && o.enabled !== false && SPECIAL_DEF[o.type] ? deepMerge(SPECIAL_DEF[o.type], o) : null;
   };
-  const SPECIAL_TYPES = { sonicDash: startSonicDash, slashBarrage: startBarrage, piercingBeam: startBeam, crescentWave: startCrescent };
+  const SPECIAL_TYPES = { sonicDash: startSonicDash, slashBarrage: startBarrage, piercingBeam: startBeam, crescentWave: startCrescent, stormCyclone: startStorm, radialBurst: startRadialBurst };
 
   const hasFX = () => typeof SkillFX !== 'undefined' && SkillFX;
   const alive = m => !!(m && m.wrap && (!m.phase || m.phase === 'alive') && !(m.hp <= 0) && !m.wrap.isDisposed());
@@ -394,7 +444,7 @@ const Combat = (() => {
     const a = p && p.anim; if (!a) return;
     const c = list.find(n => a.has(n)); if (c) a.act(c, { duration: dur });
   }
-  const cancelNormal = () => { cur = null; queue = null; gapT = 0; comboT = 0; comboIdx = 0; lockT = 0; };   // สกิลพิเศษตัดท่าฟันปกติทันที
+  const cancelNormal = () => { cur = null; queue = null; gapT = 0; comboT = 0; comboIdx = 0; lockT = 0; pose.mirror = false; };   // สกิลพิเศษตัดท่าฟันปกติทันที
 
   function specialInfo(slot) {                          // ให้ปุ่มบนจอ (skill-ui.js) อ่านสถานะ
     const w = weapons && weapons[wId], d = specialDef(w, slot), key = slot.toUpperCase();
@@ -421,11 +471,12 @@ const Combat = (() => {
 
   function finishSpecial(s) {
     if (sp !== s) return;
-    sp = null;
+    sp = null; clearPose();
     if (typeof Events !== 'undefined') Events.emit('skill:ended', { slot: s.slot, type: s.d.type, weapon: s.wid });
   }
   function abortSpecial() {                             // ตาย/ถูกตัด/ปิดฉาก → ปล่อยสตันทุกตัว ล้างเอฟเฟกต์
-    const s = sp; if (!s) return; sp = null;
+    const s = sp; if (!s) return; sp = null; clearPose();
+    if (s.onAbort) { try { s.onAbort(s); } catch (e) { console.error('[combat] onAbort', e); } }
     if (s.phase === 'dash' && ctx.cancelDash) ctx.cancelDash();
     const list = s.targets || (s.hit ? [s.hit] : []);
     list.forEach(m => { try { ctx.unstun && ctx.unstun(m); } catch (e) {} });
@@ -435,6 +486,9 @@ const Combat = (() => {
   function dispose() {                                  // ฉาก/เกมถูกปิด → ล้างทุกอย่างให้เรียบร้อย
     if (disposed) return; disposed = true;
     abortSpecial(); sched = [];
+    storms.forEach(st => endStorm(st, true)); storms = [];            // พายุที่ยังหมุนอยู่ → ปล่อยสตัน + ปิดเอฟเฟกต์
+    clearPose();
+    for (const id in nodes) { try { setWeaponOn(id, false); nodes[id].dispose(); (extra[id] || []).forEach(e => e.g.dispose()); } catch (e) {} delete nodes[id]; delete extra[id]; }
     if (spKeyHandler) removeEventListener('keydown', spKeyHandler);
     if (hasFX()) SkillFX.dispose();
     if (typeof SkillUI !== 'undefined') SkillUI.dispose();
@@ -447,10 +501,11 @@ const Combat = (() => {
       const due = sched.filter(e => e.t <= 0); sched = sched.filter(e => e.t > 0);
       if (!disposed) due.forEach(e => { try { e.fn(); } catch (err) { console.error('[combat] scheduled', err); } });
     }
+    if (storms.length) tickStorms(dt, p);
     if (!sp) return;
     if (!p || p.dead || disposed) { abortSpecial(); return; }
     const s = sp;
-    try { s.type === 'z' ? updateSonic(s, dt, p) : s.type === 'x' ? updateBarrage(s, dt, p) : updateCast(s, dt, p); }
+    try { s.type === 'z' ? updateSonic(s, dt, p) : s.type === 'x' ? updateBarrage(s, dt, p) : s.type === 'tl' ? updateTimeline(s, dt, p) : updateCast(s, dt, p); }
     catch (e) { console.error('[combat] special update', e); abortSpecial(); }
   }
 
@@ -646,6 +701,144 @@ const Combat = (() => {
           if (hasFX()) { const q = mobAt(m); SkillFX.hitSpark(q.x, q.y, q.z, 8); }
         }
       });
+    }
+  }
+
+
+  // =====================================================================
+  // ===== ขวานคู่: Z = Cyclone Storm (พายุหมุนยักษ์ ดาเมจซ้ำ + สตันคุมเวลา) / X = Slash Burst (ย่อตัวแล้วระเบิดเส้นฟันรอบทิศ + ผลักแรง) =====
+  // combat.js คิดดาเมจ/สตัน/ผลัก/เวลาทั้งหมด — SkillFX แค่เล่นภาพ (ภาพไม่ได้กำหนดว่าใครโดน)
+  // =====================================================================
+  SPECIAL_DEF.stormCyclone = { name: 'Cyclone Storm', cooldown: 18, cost: 85,
+    lunge: { distance: 3.5, duration: 0.3 },                              // พุ่งสั้นๆ ใช้ระบบพุ่งชนของเดิม (ไม่หัก Stamina ซ้ำ)
+    castTime: 0.6, releaseAt: 0.42, spinTime: 0.5,                         // ท่าร่ายรวม / จังหวะปล่อยพายุ / เวลาหมุนตัว
+    anim: ['atk2hSpin', 'atk2hSpinning', 'atkDualSlice', 'atkHorizontal'], spin: 'auto',   // spin 'auto' = หมุนตัว procedural เฉพาะเมื่อไม่มีคลิปหมุนที่ชื่อตรง
+    aimRange: 14, centerDist: 7, minCenter: 3, maxCenter: 12,              // ศูนย์กลางพายุ = ข้างหน้า centerDist (หรือที่ศัตรูใกล้สุดข้างหน้า) ไม่เกิน maxCenter
+    radius: 9, duration: 3, collapse: 1.0, shrinkStart: 0.7, shrinkTo: 0.45, height: 11,   // ช่วง active 3 วิ: 70% แรกเต็มรัศมี แล้วหดเหลือ 45% ก่อนยุบเข้าแกน
+    tickInterval: 0.25, tickMult: 0.6, initialMult: 3,                      // ดาเมจแรงกระแทก + ทิกซ้ำทุก 0.25 วิ
+    stun: true, stunPad: 0.15 };                                           // สตันแบบต่ออายุทีละทิก (ทิก + pad วิ) → ไม่ค้างถาวรแม้สกิลถูกตัด
+  SPECIAL_DEF.radialBurst = { name: 'Slash Burst', cooldown: 15, cost: 80,
+    crouchTime: 0.55, squash: 0.14, releaseTime: 0.55, burstAt: 0.2,        // ย่อ 0.55 วิ (ท่า Crouching + บีบตัว) → ปล่อยท่าฟาด → ระเบิดที่ 0.2 วิ
+    anim: { release: ['atk2hChop', 'atkDualChop', 'atkJumpChop', 'atkChop'] },
+    aimRange: 14, centerOffset: 3, radius: 13, rearLimit: 4,                // ศูนย์กลางระเบิดอยู่ข้างหน้า 3 หน่วย รัศมี 13; ด้านหลังตัวเกิน 4 หน่วยไม่โดน
+    mult: 5.5, knock: { dist: 7, dur: 0.4 } };                             // ดาเมจครั้งเดียวต่อมอน + ผลักแรงออกจากศูนย์กลาง (ไม่สตัน)
+
+  let storms = [];
+  const clamp01_ = x => x < 0 ? 0 : x > 1 ? 1 : x, easeIO = k => k * k * (3 - 2 * k);
+  function applyPose(p, dt) {                                              // กลับซ้าย-ขวา (scale.x = -1) และ/หรือบีบตัวลง (scale.y) ที่ตัวผู้เล่น — คืนค่าเมื่อจบท่า
+    if (!p || !p.wrap || !p.wrap.scaling) return;
+    if (pose.squash !== pose.target) { pose.squash += (pose.target - pose.squash) * Math.min(1, dt * 16); if (Math.abs(pose.target - pose.squash) < 0.002) pose.squash = pose.target; }
+    const neutral = !pose.mirror && !pose.squash;
+    if (neutral && !pose.dirty) return;
+    const s = p.wrap.scaling; s.x = pose.mirror ? -1 : 1; s.y = 1 - pose.squash; pose.dirty = !neutral;
+  }
+  function clearPose() { pose.mirror = false; pose.target = 0; pose.squash = 0; applyPose(ctx && ctx.getPlayer(), 0); }
+
+  // ลำดับเหตุการณ์ตามเวลา (ท่าร่าย → ปล่อยสกิล): events = [{ at, fn(s, p) }], end = เวลาที่ผู้เล่นกลับมาควบคุมได้
+  function startTimeline(w, d, slot, events, end, hooks) {
+    events.sort((a, b) => a.at - b.at);
+    sp = Object.assign({ slot, type: 'tl', d, w, wid: wId, phase: 'tl', t: 0, events, ei: 0, end }, hooks || {});
+    return sp;
+  }
+  function updateTimeline(s, dt, p) {
+    s.t += dt;
+    while (s.ei < s.events.length && s.t >= s.events[s.ei].at) { s.events[s.ei++].fn(s, p); if (sp !== s) return; }
+    if (s.upd) s.upd(s, dt, p);
+    if (s.t >= s.end) finishSpecial(s);
+  }
+  const logOnce = (k, msg) => { if (!castLogged[k]) { castLogged[k] = 1; console.info(msg); } };
+
+  // ---------- Z: Cyclone Storm ----------
+  function startStorm(p, w, d, slot) {
+    const a = p.anim;
+    const tgt = nearest(p, d.maxCenter, 140);                              // เลือกเป้าหมายก่อนหมุนตัว (หมุนแล้วมุมเล็งจะเพี้ยน)
+    if (cfg.autoAim !== false && tgt) faceTo(p, tgt.wrap.position.x, tgt.wrap.position.z);
+    const h0 = ctx.getHeading();
+    if (ctx.skillDash && d.lunge) ctx.skillDash({ distance: d.lunge.distance, duration: d.lunge.duration, iframe: d.lunge.duration });   // พุ่งสั้น (ชนของ/หน้าผาแบบ Dash)
+    const exact = a && d.anim.find(n => a.exact && a.exact(n)), clip = exact || (a && d.anim.find(n => a.has(n))) || null;
+    const procSpin = d.spin === true || (d.spin !== false && !exact);       // ไม่มีคลิปหมุนจริง → หมุนตัวเองทั้งตัว 360°
+    if (clip) a.act(clip, { duration: d.castTime });                        // (เรียกหลัง skillDash เพื่อทับท่า Dodge)
+    logOnce('storm' + (exact ? 'x' : clip ? 'f' : 'n'), '[skill] Cyclone Storm: animation = ' + (exact ? 'exact ' + exact : clip ? 'fallback ' + clip : 'none') + (procSpin ? ' + procedural spin' : ''));
+    startTimeline(w, d, slot, [{ at: d.releaseAt, fn: (s, pl) => releaseStorm(s, pl, h0, tgt) }], d.castTime, {
+      upd: (s, dt) => { if (procSpin) ctx.setHeading(h0 + Math.PI * 2 * easeIO(clamp01_(s.t / d.spinTime))); }
+    });
+    return true;
+  }
+  function releaseStorm(s, p, h0, tgt) {
+    const d = s.d, pos = p.wrap.position, fx_ = Math.sin(h0), fz = Math.cos(h0);
+    let dist = d.centerDist;
+    if (tgt && alive(tgt)) dist = Math.min(d.maxCenter, Math.max(d.minCenter, planar(tgt.wrap.position, pos)));   // มีเป้า → ศูนย์กลางไปอยู่ที่เป้า (คลุมกลุ่มศัตรู)
+    let cx = pos.x, cz = pos.z;
+    for (let r = dist; r >= 0; r -= 1) {                                    // ถอยเข้าหาตัวจนเจอพื้นที่ยืนได้ (ไม่ตั้งกลางน้ำ/นอกแมพ)
+      const x = pos.x + fx_ * r, z = pos.z + fz * r;
+      if (!ctx.heightAt || ctx.heightAt(x, z) > -0.9) { cx = x; cz = z; break; }
+    }
+    const gy = ctx.heightAt ? ctx.heightAt(cx, cz) : pos.y;
+    const st = { x: cx, y: gy, z: cz, d, w: s.w, wid: s.wid, t: 0, ticks: 0, maxTicks: Math.floor(d.duration / d.tickInterval + 1e-6), stunned: new Set(), fxh: null };
+    if (hasFX()) st.fxh = SkillFX.storm({ x: cx, y: gy, z: cz, radius: d.radius, duration: d.duration, collapse: d.collapse, shrinkStart: d.shrinkStart, shrinkTo: d.shrinkTo, height: d.height });
+    storms.push(st);                                                        // พายุอยู่กับที่ ทำงานต่อแม้ผู้เล่นขยับ/ท่าร่ายจบแล้ว (tickStorms)
+    stormPulse(st, d.initialMult);                                          // แรงกระแทกครั้งแรก
+  }
+  const stormRadius = st => { const d = st.d, ds = d.duration * d.shrinkStart; return d.radius * (st.t <= ds ? 1 : 1 - (1 - d.shrinkTo) * clamp01_((st.t - ds) / Math.max(0.01, d.duration - ds))); };   // สูตรเดียวกับภาพ: หดตอนท้าย
+  function stormPulse(st, mult) {                                           // ดาเมจ + ต่อสตัน เฉพาะศัตรูที่อยู่ในรัศมี "ตอนนี้"
+    const d = st.d, r = stormRadius(st) + 0.6, now = new Set();
+    for (const m of ctx.mobs) {
+      if (!alive(m) || planar(m.wrap.position, st) > r) continue;
+      hurt(m, dmgOf(st.w, mult), 'special:z', st.wid);
+      if (alive(m)) { now.add(m); if (d.stun && ctx.stun) ctx.stun(m, d.tickInterval + (d.stunPad == null ? 0.15 : d.stunPad)); }
+    }
+    st.stunned.forEach(m => { if (!now.has(m) && ctx.unstun) ctx.unstun(m); });   // ออกนอกพายุแล้ว → ปล่อยทันที
+    st.stunned = now;
+  }
+  function endStorm(st, aborted) {
+    st.stunned.forEach(m => { try { ctx.unstun && ctx.unstun(m); } catch (e) {} }); st.stunned = new Set();   // จบ/ถูกตัด/ผู้เล่นตาย → ไม่มีใครค้างสตัน
+    if (st.fxh) { if (!aborted) return; if (disposed) st.fxh.cancel(); else st.fxh.collapse(); }                // จบปกติ: เอฟเฟกต์ยุบตัวเองต่อ / ถูกตัด: ยุบเร็ว
+  }
+  function tickStorms(dt, p) {
+    const gone = disposed || !p || p.dead;
+    for (let i = storms.length - 1; i >= 0; i--) {
+      const st = storms[i];
+      if (gone) { endStorm(st, true); storms.splice(i, 1); continue; }
+      st.t += dt;
+      const due = Math.min(Math.floor(st.t / st.d.tickInterval + 1e-6), st.maxTicks);
+      while (st.ticks < due) { st.ticks++; stormPulse(st, st.d.tickMult); }
+      if (st.t >= st.d.duration - 1e-6) { endStorm(st, false); storms.splice(i, 1); }
+    }
+  }
+
+  // ---------- X: Crouching Radial Slash Burst ----------
+  function startRadialBurst(p, w, d, slot) {
+    const a = p.anim, pos = p.wrap.position;
+    if (cfg.autoAim !== false) { const t = nearest(p, d.aimRange, 160); if (t) faceTo(p, t.wrap.position.x, t.wrap.position.z); }
+    const f = forward2(), crouchOk = !!(a && a.has('crouch'));
+    if (crouchOk) a.act('crouch');                                          // ท่า Crouching จริง (วนลูป)
+    pose.target = d.squash;                                                 // + บีบตัวลงให้เห็นว่าย่อชัดเจน แม้ไม่มีคลิป
+    if (hasFX()) SkillFX.chargeRing(pos.x, pos.y + 0.1, pos.z, d.crouchTime, 7);   // วงรวมพลังหดเข้าหาตัว = จังหวะสะสมแรง
+    const rel = a && (d.anim.release.find(n => a.exact && a.exact(n)) || d.anim.release.find(n => a.has(n)));
+    logOnce('burst' + crouchOk + (rel || ''), '[skill] Slash Burst: crouch clip = ' + (crouchOk ? 'Crouching' : 'missing → procedural squash only') + ', release = ' + (rel || 'none'));
+    startTimeline(w, d, slot, [
+      { at: d.crouchTime, fn: (s, pl) => { pose.target = 0; if (rel && pl.anim) pl.anim.act(rel, { duration: d.releaseTime }); } },
+      { at: d.crouchTime + d.burstAt, fn: (s, pl) => burstNow(s, pl, f) }
+    ], d.crouchTime + d.releaseTime + 0.05);
+    return true;
+  }
+  function burstNow(s, p, f) {
+    const d = s.d, pos = p.wrap.position, cx = pos.x + f.x * d.centerOffset, cz = pos.z + f.z * d.centerOffset;
+    const gy = ctx.heightAt ? ctx.heightAt(cx, cz) : pos.y;
+    if (hasFX()) SkillFX.radialBurst({ x: cx, y: gy, z: cz, yaw: f.h, radius: d.radius });   // ภาพล้วน: เส้นฟันกี่เส้นก็ไม่มีผลต่อดาเมจ
+    const hit = new Set();                                                  // ดาเมจคิดที่นี่ครั้งเดียวต่อมอน (ไม่ขึ้นกับจำนวนเส้นเอฟเฟกต์)
+    for (const m of ctx.mobs) {
+      if (!alive(m) || hit.has(m)) continue;
+      const mp = m.wrap.position;
+      if (Math.hypot(mp.x - cx, mp.z - cz) > d.radius + 0.6) continue;
+      if ((mp.x - pos.x) * f.x + (mp.z - pos.z) * f.z < -d.rearLimit) continue;   // เน้นด้านหน้า: ด้านหลังตัวไกลเกินไม่โดน
+      hit.add(m);
+      hurt(m, dmgOf(s.w, d.mult), 'special:x', s.wid);
+      if (alive(m)) {
+        let kx = mp.x - cx, kz = mp.z - cz; if (Math.hypot(kx, kz) < 0.5) { kx = f.x; kz = f.z; }
+        if (ctx.knock) ctx.knock(m, kx, kz, d.knock.dist, d.knock.dur);       // ผลักแรงออกจากศูนย์กลาง (ไม่สตัน)
+        if (hasFX()) { const q = mobAt(m); SkillFX.hitSpark(q.x, q.y, q.z, 5); }
+      }
     }
   }
 

@@ -12,6 +12,11 @@
 //   SkillFX.beam({x,y,z,yaw,length,speed,width})  ดาบ Z: ลำแสงยาวพร้อมวงแหวนเกลียวฟ้า-ม่วง (ภาพอ้างอิง Piercing Beam)
 //   SkillFX.explosion(x,y,z, radius)             ดาบ Z: ระเบิดทรงกลมขาว + วงหมุนวน + แรงกระแทก (ภาพอ้างอิงระเบิด)
 //   SkillFX.crescent({x,y,z,yaw,range,speed,startRadius,height})  ดาบ X: คลื่นเสี้ยวพระจันทร์ 3 ชั้นกวาด 180° ด้านหน้า
+//   SkillFX.storm({x,y,z,radius,duration,collapse,shrinkStart,shrinkTo,height}) → { collapse(), cancel() }
+//                                                ขวานคู่ Z: พายุหมุนยักษ์ (แกนขาว + ริบบิ้น/สไปรัลซ้อนชั้น ขาว-เงิน-ถ่าน) ค่อยๆ ยุบเข้าแกนแล้วจาง
+//   SkillFX.radialBurst({x,y,z,yaw,radius})      ขวานคู่ X: ระเบิดเส้นฟันขาวรอบทิศ + เงาถ่าน + ริบบิ้นโค้ง + เศษดิน
+//   SkillFX.chargeRing(x,y,z,dur,size)           ขวานคู่ X: วงรวมพลังหดเข้าหาตัวตอนย่อ
+//   SkillFX.slam(x,y,z,radius,power)             ขวานคู่ ท่า 3: กระแทกพื้นวงกว้าง + จอสั่น
 //   SkillFX.cancelAll() / SkillFX.dispose()      ล้างเอฟเฟกต์ที่เล่นอยู่ / ทิ้งทุกอย่าง
 //
 // ทุกอย่างเป็นพูลขนาดคงที่ (ไม่สร้างเมชใหม่ระหว่างเล่น) — พูลเต็มก็แค่ข้ามเอฟเฟกต์ชิ้นนั้น ไม่ล้น/ไม่แลค
@@ -26,6 +31,11 @@ const SkillFX = (() => {
   const bm = { on: false, t: 0, x: 0, y: 0, z: 0, dx: 0, dz: 1, yaw: 0, L: 20, speed: 100, w: 1.5, ringT: 0, tipT: 0, core: null, mid: null, outer: null };
   const ex = { on: false, t: 0, x: 0, y: 0, z: 0, R: 5, core: null, shell: null };
   const cw = { on: false, t: 0, x: 0, y: 0, z: 0, yaw: 0, range: 40, speed: 30, r0: 1.2, h: 6.5, dustT: 0, waves: [] };
+  // ขวานคู่: เมชที่สร้างเพิ่ม (ไว้ dispose) / พายุ / ระเบิดเส้นฟัน / เศษดิน
+  const xtra = [], chunks = [];
+  const stm = { on: false, t: 0, x: 0, y: 0, z: 0, R: 9, H: 11, D: 3, D0: 3, ds: 2.1, C: 1, sto: 0.45, rEnd: 4, rs: [], sl: [], core: null, shell: null, disc: null, ringT: 0, dustT: 0, chunkT: 0, strT: 0 };
+  const bur = { on: false, t: 0, x: 0, y: 0, z: 0, yaw: 0, R: 13, bl: [], sw: [], sd: [], core: null, disc: null, strN: 0 };
+  let dustG = null, dustGPos = null;
   const shk = { amp: 0, t: 0, dur: 0.3 };
   const camR = { x: 1, y: 0, z: 0 }, camU = { x: 0, y: 1, z: 0 };
   let tmpV = null, tmpR = null, tmpU = null;
@@ -35,14 +45,23 @@ const SkillFX = (() => {
   const easeOut = k => 1 - (1 - k) * (1 - k);
   const easeOut3 = k => 1 - Math.pow(1 - clamp01(k), 3);
   const take = pool => { for (let i = 0; i < pool.length; i++) if (!pool[i].on) return pool[i]; return null; };   // พูลเต็ม → null (ข้าม)
-  const noop = { setCenter() {}, stop() {}, cancel() {} };
+  const noop = { setCenter() {}, stop() {}, cancel() {}, collapse() {} };   // handle ว่าง (FX ยังไม่พร้อม/ถูก dispose) — ต้องมีครบทุกเมธอดที่ combat.js เรียก
 
   // ---------- สร้างของ (ครั้งเดียว) ----------
   function makeTex(name, size, draw) {
     const t = new B.DynamicTexture(name, size, scene, true), c = t.getContext();
     c.fillStyle = '#000'; c.fillRect(0, 0, size, size); draw(c, size); t.update(); return t;   // พื้นดำ + ลายขาว → ใช้กับ additive (ดำ = ไม่เห็น)
   }
+  function makeTexA(name, size, draw) {                                // พื้นโปร่งใส (ใช้กับอนุภาคฝุ่นที่ไม่ใช่ additive)
+    const t = new B.DynamicTexture(name, size, scene, true), c = t.getContext();
+    c.clearRect(0, 0, size, size); draw(c, size); t.hasAlpha = true; t.update(); return t;
+  }
   function buildTextures() {
+    tex.puff = makeTexA('fxPuff', 128, (c, s) => {
+      const g = c.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+      g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = g; c.fillRect(0, 0, s, s);
+    });
     tex.soft = makeTex('fxSoft', 128, (c, s) => {
       const g = c.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
       g.addColorStop(0, '#fff'); g.addColorStop(0.35, 'rgba(255,255,255,.55)'); g.addColorStop(1, '#000');
@@ -73,6 +92,11 @@ const SkillFX = (() => {
     mat.silver = addMat('fxSilver', 0.72, 0.86, 1);                    // เงินอมฟ้า ใช้เป็นฮาโล/ชั้นนอก
     mat.cyan = addMat('fxCyan', 0.3, 0.9, 1); mat.violet = addMat('fxViolet', 0.8, 0.45, 1);
     mat.blue = addMat('fxBlue', 0.35, 0.6, 1); mat.ice = addMat('fxIce', 0.82, 0.96, 1);
+    mat.steel = addMat('fxSteel', 0.68, 0.71, 0.77);                    // เทาเงิน (additive)
+    mat.dark = addMat('fxDark', 0.05, 0.05, 0.07);                      // ถ่านดำ: ผสมสีแบบปกติ (ไม่ additive) → เงาเข้มที่เห็นชัดตัดกับเส้นขาว
+    mat.dark.alphaMode = B.Engine.ALPHA_COMBINE; mat.dark.alpha = 0.99;
+    mat.chunk = new B.StandardMaterial('fxChunk', scene);              // เศษดินทึบ (ไม่โปร่งใส)
+    mat.chunk.disableLighting = true; mat.chunk.diffuseColor = B.Color3.Black(); mat.chunk.specularColor = B.Color3.Black(); mat.chunk.emissiveColor = new B.Color3(0.2, 0.19, 0.18); mat.chunk.fogEnabled = false;
     mat.star = addMat('fxStarM', 1, 1, 1, tex.star);
     mat.soft = addMat('fxSoftM', 1, 1, 1, tex.soft);
   }
@@ -107,7 +131,7 @@ const SkillFX = (() => {
     tpl.quad = prep(M.CreatePlane('fxQuadT', { size: 1 }, scene), mat.star);
     tpl.shard = prep(M.CreateCylinder('fxShardT', { height: 1, diameterTop: 0, diameterBottom: 0.2, tessellation: 4 }, scene), mat.white);
     for (let i = 0; i < (O.maxRings || 30); i++) P.ring.push({ on: false, mesh: clone(tpl.ring, 'fxRing' + i) });
-    for (let i = 0; i < (O.maxStreaks || 24); i++) P.streak.push({ on: false, mesh: clone(tpl.box, 'fxStreak' + i) });
+    for (let i = 0; i < (O.maxStreaks || 44); i++) P.streak.push({ on: false, mesh: clone(tpl.box, 'fxStreak' + i) });
     for (let i = 0; i < (O.maxSlashes || 26); i++) {
       const core = clone(tpl.box, 'fxSlash' + i), halo = clone(tpl.box, 'fxSlashH' + i);
       halo.material = mat.silver; halo.parent = core; halo.scaling.set(3.4, 3.4, 1); halo.isVisible = false;
@@ -155,7 +179,7 @@ const SkillFX = (() => {
     O = Object.assign({ glow: true, glowIntensity: 1.0, shake: true }, opts || {});
     try {
       tmpV = new B.Vector3(); tmpR = new B.Vector3(); tmpU = new B.Vector3();
-      buildTextures(); buildMaterials(); buildGlow(); buildPools(); buildDust();
+      buildTextures(); buildMaterials(); buildGlow(); buildPools(); buildDust(); buildPools2(); buildDustGray();
       shakeObs = scene.onBeforeRenderObservable.add(applyShake);
       disposeObs = scene.onDisposeObservable.add(() => { ok = false; });
       ok = true;
@@ -308,9 +332,266 @@ const SkillFX = (() => {
     if (O.shake !== false) { shk.amp = 0.2; shk.t = shk.dur = 0.35; }
   }
 
+  // ===================== ขวานคู่: Cyclone Storm / Radial Slash Burst / Ground Slam =====================
+  const lerp = (a, b, k) => a + (b - a) * k, easeIn = k => k * k;
+  const track = m => { xtra.push(m); return m; };
+  function mkC(t, name, material, mode) {                              // โคลนจากต้นแบบ: mode 'dark' = เงาถ่าน (ไม่ glow, วาดก่อน) / 'plain' = ไม่ glow / ไม่ใส่ = เรืองแสง
+    const m = t.clone(name); m.material = material; m.isVisible = false; m.isPickable = false; m.alwaysSelectAsActiveMesh = true; m.receiveShadows = false;
+    m.hasVertexAlpha = t.hasVertexAlpha;
+    if (mode === 'dark') m.alphaIndex = 10;                            // วาดก่อนเส้นสว่าง (ที่ alphaIndex เริ่มต้น = ท้ายสุด) → เส้นขาวทับบนเงาดำ
+    else if (mode !== 'plain' && glow) glow.addIncludedOnlyMesh(m);
+    return track(m);
+  }
+  function buildPools2() {
+    const M = B.MeshBuilder, ALPHA3 = [1, 0.18, 0.9];
+    const geo = (name, pos, idx, col) => {
+      const m = new B.Mesh(name, scene), vd = new B.VertexData();
+      vd.positions = pos; vd.indices = idx; if (col) vd.colors = col; vd.applyToMesh(m);
+      if (col) m.hasVertexAlpha = true; m.isVisible = false; m.isPickable = false; return track(m);
+    };
+    const strip = (N, arms, rowsFn, alphas) => {                        // แถบ 3 แถว (ขอบสว่าง / กลางโปร่ง / ขอบสว่าง) ผ่าน vertex alpha
+      const pos = [], col = [], idx = [], A = alphas || ALPHA3;
+      for (let k = 0; k < arms; k++) {
+        const base = pos.length / 3;
+        for (let i = 0; i <= N; i++) rowsFn(i / N, k).forEach((r, j) => { pos.push(r[0], r[1], r[2]); col.push(1, 1, 1, A[j]); });
+        for (let i = 0; i < N; i++) for (let r = 0; r < 2; r++) { const a = base + i * 3 + r, b = a + 3; idx.push(a, b, b + 1, a, b + 1, a + 1); }
+      }
+      return [pos, idx, col];
+    };
+    const funnel = (turns, hbMax) => u => {                             // แถบเกลียวทรงกรวย (แคบล่าง กว้างบน) เรียวปลายทั้งสองข้าง
+      const a = turns * 6.2832 * u, r = 0.3 + 0.7 * Math.pow(u, 0.85), hb = hbMax * Math.pow(Math.sin(Math.PI * u), 0.7) * (0.45 + 0.9 * u), x = Math.sin(a) * r, z = Math.cos(a) * r;
+      return [[x, u + hb, z], [x, u, z], [x, u - hb, z]];
+    };
+    const spiral = (u, k) => {                                          // แขนก้นหอยแบนราบ 3 แขน (เห็นเป็นกระแสวนเมื่อมองจากกล้องเฉียงลง)
+      const a = k * 6.2832 / 3 + 0.9 * 6.2832 * u, r = 0.1 + 0.9 * Math.pow(u, 0.85), w = 0.17 * Math.pow(Math.sin(Math.PI * u), 0.7) * (0.4 + 0.8 * u), ro = r * (1 + w * 0.6), ri = r * (1 - w);
+      return [[Math.sin(a) * ro, 0, Math.cos(a) * ro], [Math.sin(a) * r, 0, Math.cos(a) * r], [Math.sin(a) * ri, 0, Math.cos(a) * ri]];
+    };
+    const swoosh = u => {                                               // เสี้ยวโค้งแบนราบ ปลายแหลมทั้งสองข้าง
+      const a = (u - 0.5) * 1.9, ri = 1 - 0.34 * Math.pow(Math.sin(Math.PI * u), 0.8), rm = (1 + ri) / 2;
+      return [[Math.sin(a), 0, Math.cos(a)], [Math.sin(a) * rm, 0, Math.cos(a) * rm], [Math.sin(a) * ri, 0, Math.cos(a) * ri]];
+    };
+    tpl.helixW = geo('fxHelixW', ...strip(64, 1, funnel(1.15, 0.12)));
+    tpl.helixT = geo('fxHelixT', ...strip(72, 1, funnel(2.6, 0.035)));
+    tpl.spiral = geo('fxSpiral', ...strip(48, 3, spiral));
+    tpl.swoosh = geo('fxSwoosh', ...strip(28, 1, swoosh, [1, 0.55, 0.2]));
+    tpl.blade = geo('fxBladeT', [0, 0, -0.5, -0.5, 0, 0, 0, 0, 0.5, 0.5, 0, 0], [0, 1, 2, 0, 2, 3]);   // ใบฟันรูปข้าวหลามตัดแหลมสองปลาย (ยาวตามแกน z)
+    tpl.disc = track(M.CreateDisc('fxDiscT', { radius: 0.5, tessellation: 40 }, scene)); tpl.disc.isVisible = false;
+    tpl.chunk = track(M.CreateBox('fxChunkT', { size: 1 }, scene)); tpl.chunk.isVisible = false;
+
+    // --- พายุ: ก้นหอยแบน 7 ชั้น + กรวยเกลียว 4 + แถบเรียว 6 + เส้นฟันโคจร 10 + แกน/เปลือก + เงาพื้น ---
+    const rs = stm.rs;
+    [[mat.dark, 0.18, 1.05, 2.2, 0.75, 1], [mat.white, 0.55, 1.0, -3.2, 0.8], [mat.steel, 1.5, 0.9, 4, 0.6], [mat.dark, 2.2, 0.85, -2.6, 0.7, 1],
+     [mat.white, 3.2, 0.72, 5.2, 0.8], [mat.steel, 4.6, 0.55, -6, 0.55], [mat.white, 6.2, 0.38, 7.5, 0.75]].forEach(([mt, y, rm, spd, v0, dk], i) =>
+      rs.push({ kind: 'spiral', mesh: mkC(tpl.spiral, 'fxStSp' + i, mt, dk ? 'dark' : null), y, rm, spd, v0, hm: 1, ang: rnd(0, 6.28), th: 0 }));
+    [[mat.white, 1.0, 5, 0.85, 0], [mat.dark, 0.85, 3, 0.7, 1], [mat.steel, 0.75, -4, 0.7, 0], [mat.white, 0.5, -7, 0.8, 0]].forEach(([mt, rm, spd, v0, dk], i) =>
+      rs.push({ kind: 'funnel', mesh: mkC(tpl.helixW, 'fxStFn' + i, mt, dk ? 'dark' : null), y: 0, rm, spd, v0, hm: 1, ang: rnd(0, 6.28), th: 0 }));
+    [1.2, 1.05, 0.9, 0.75, 0.6, 0.45].forEach((rm, i) =>
+      rs.push({ kind: 'trail', mesh: mkC(tpl.helixT, 'fxStTr' + i, i % 2 ? mat.steel : mat.white), y: 0, rm, spd: (i % 2 ? -1 : 1) * (4 + i * 1.1), v0: 0.8, hm: 0.9 + i * 0.03, ang: rnd(0, 6.28), th: 0 }));
+    const order = rs.map((r, i) => i).sort((a, b) => rs[b].rm - rs[a].rm);          // ชั้นนอกสุดหายก่อน
+    order.forEach((idx, rank) => { rs[idx].th = 0.18 + 0.62 * rank / (order.length - 1); });
+    for (let i = 0; i < 10; i++) stm.sl.push({ mesh: mkC(tpl.box, 'fxStSl' + i, mat.white), a: rnd(0, 6.28), spd: (Math.random() < 0.5 ? -1 : 1) * rnd(1.5, 5), fr: rnd(0.35, 0.95), yh: rnd(0.05, 0.9), len: rnd(2.4, 5), th: rnd(0.15, 0.7) });
+    stm.core = mkC(tpl.sphere, 'fxStCore', mat.white); stm.shell = mkC(tpl.sphere, 'fxStShell', mat.ice);
+    stm.disc = mkC(tpl.disc, 'fxStDisc', mat.dark, 'dark'); stm.disc.rotation.x = Math.PI / 2; stm.disc.alphaIndex = 5;
+
+    // --- ระเบิดเส้นฟัน: ใบขาว 40 + เงาถ่าน 22 + ฮาโลม่วงอ่อน 14 + เสี้ยวโค้ง 8/6 + แกน + รอยไหม้พื้น ---
+    const nb = O.maxBlades || 40;
+    for (let i = 0; i < nb; i++) bur.bl.push({ mesh: mkC(tpl.blade, 'fxBl' + i, mat.white), dk: i < 22 ? mkC(tpl.blade, 'fxBd' + i, mat.dark, 'dark') : null, hh: i < 14 ? mkC(tpl.blade, 'fxBh' + i, mat.violet) : null, a: 0, e: 0, d: 0, te: 0.2, R: 1, L: 1, w: 0.4, da: 0 });
+    for (let i = 0; i < 8; i++) bur.sw.push({ mesh: mkC(tpl.swoosh, 'fxSw' + i, mat.white) });
+    for (let i = 0; i < 6; i++) bur.sd.push({ mesh: mkC(tpl.swoosh, 'fxSd' + i, mat.dark, 'dark') });
+    bur.core = mkC(tpl.sphere, 'fxBuCore', mat.white);
+    bur.disc = mkC(tpl.disc, 'fxBuDisc', mat.dark, 'dark'); bur.disc.rotation.x = Math.PI / 2; bur.disc.alphaIndex = 5;
+    for (let i = 0; i < (O.maxChunks || 28); i++) chunks.push({ on: false, mesh: mkC(tpl.chunk, 'fxCh' + i, mat.chunk, 'plain') });
+  }
+  function buildDustGray() {                                           // ฝุ่นเทา (ผสมสีปกติ ไม่ additive) — ล้มเหลวก็ข้าม
+    try {
+      dustGPos = new B.Vector3();
+      const ps = new B.ParticleSystem('skillDustGray', 160, scene);
+      ps.particleTexture = tex.puff; ps.emitter = dustGPos;
+      ps.minEmitBox = new B.Vector3(-1, 0, -1); ps.maxEmitBox = new B.Vector3(1, 0.3, 1);
+      ps.direction1 = new B.Vector3(-1, 0.5, -1); ps.direction2 = new B.Vector3(1, 1.8, 1);
+      ps.minEmitPower = 1.5; ps.maxEmitPower = 6; ps.minLifeTime = 0.5; ps.maxLifeTime = 1.1; ps.minSize = 0.9; ps.maxSize = 2.8;
+      ps.color1 = new B.Color4(0.62, 0.63, 0.67, 0.55); ps.color2 = new B.Color4(0.36, 0.37, 0.4, 0.45); ps.colorDead = new B.Color4(0.2, 0.2, 0.22, 0);
+      ps.gravity = new B.Vector3(0, -1.5, 0); ps.emitRate = 0; ps.blendMode = B.ParticleSystem.BLENDMODE_STANDARD;
+      ps.start(); dustG = ps;
+    } catch (e) { dustG = null; console.warn('[skill-fx] gray dust unavailable', e); }
+  }
+  function dustGrayAt(x, y, z, n, spread) {
+    if (!dustG) return;
+    dustGPos.set(x, y, z); const sp = spread || 1; dustG.minEmitBox.set(-sp, 0, -sp); dustG.maxEmitBox.set(sp, 0.3, sp);
+    dustG.manualEmitCount = Math.max(0, dustG.manualEmitCount) + n;
+  }
+  function chunkSpawn(x, y, z, vx, vy, vz, size, life) {                // เศษดินทึบ มีแรงโน้มถ่วง เด้งพื้นเล็กน้อย
+    const c = take(chunks); if (!c) return;
+    c.on = true; c.t = 0; c.life = life; c.vx = vx; c.vy = vy; c.vz = vz; c.gy = y; c.size = size; c.sx = rnd(-12, 12); c.sz = rnd(-12, 12);
+    c.mesh.position.set(x, y + 0.15, z); c.mesh.rotation.set(rnd(0, 6), rnd(0, 6), rnd(0, 6)); c.mesh.scaling.set(size, size * rnd(0.6, 1.2), size * rnd(0.7, 1.3)); c.mesh.isVisible = true;
+  }
+  function updChunks(dt) {
+    let n = 0;
+    for (const c of chunks) if (c.on) {
+      n++; c.t += dt; const m = c.mesh, k = c.t / c.life;
+      if (k >= 1) { c.on = false; m.isVisible = false; continue; }
+      c.vy -= 26 * dt; m.position.x += c.vx * dt; m.position.y += c.vy * dt; m.position.z += c.vz * dt;
+      if (m.position.y < c.gy + 0.12 && c.vy < 0) { m.position.y = c.gy + 0.12; c.vy *= -0.3; c.vx *= 0.6; c.vz *= 0.6; }
+      m.rotation.x += c.sx * dt; m.rotation.z += c.sz * dt;
+      const s = c.size * (k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3); m.scaling.setAll(Math.max(0.01, s));   // หดหายแทนการจาง (เศษทึบ)
+    }
+    return n;
+  }
+  const rndPick = a => a[(Math.random() * a.length) | 0];
+
+  // ---------- พายุหมุนยักษ์ ----------
+  function stormRad(t) {                                                // รัศมีภาพ: โตเข้า 0.35 วิ → คงที่ → หดช่วงท้าย (สูตรเดียวกับที่ combat.js ใช้คิดดาเมจ ยกเว้นช่วงโตเข้า)
+    const R = stm.R, base = t <= stm.ds ? R : R * (1 - (1 - stm.sto) * clamp01((t - stm.ds) / Math.max(0.01, stm.D0 - stm.ds)));
+    return base * (0.2 + 0.8 * easeOut3(t / 0.35));
+  }
+  function storm(o) {
+    if (!ok || !stm.core) return noop;
+    Object.assign(stm, { on: true, t: 0, x: o.x, y: o.y, z: o.z, R: o.radius, H: o.height || 11, D: o.duration, D0: o.duration, ds: o.duration * (o.shrinkStart == null ? 0.7 : o.shrinkStart), C: o.collapse || 1, sto: o.shrinkTo == null ? 0.45 : o.shrinkTo, ringT: 0, dustT: 0, chunkT: 0, strT: 0 });
+    stm.rEnd = stm.R * stm.sto;
+    stm.rs.forEach(r => { r.mesh.isVisible = false; }); stm.sl.forEach(e => { e.mesh.isVisible = false; });
+    flareSpawn(o.x, o.y + 2, o.z, o.radius * 0.5, o.radius * 1.3, 0.28, 0.9);                       // แฟลชตอนพายุปรากฏ
+    ringSpawn({ x: o.x, y: o.y + 0.15, z: o.z, flat: true, s0: 2, s1: o.radius * 3, life: 0.5, v: 1, mat: mat.white });
+    ringSpawn({ x: o.x, y: o.y + 0.2, z: o.z, flat: true, s0: 1.5, s1: o.radius * 2, life: 0.4, v: 0.8, mat: mat.steel });
+    dustGrayAt(o.x, o.y + 0.3, o.z, 40, o.radius * 0.7);
+    for (let i = 0; i < 12; i++) { const a = rnd(0, 6.283), sp = rnd(5, 12); chunkSpawn(o.x + Math.sin(a) * o.radius * 0.5, o.y, o.z + Math.cos(a) * o.radius * 0.5, Math.sin(a) * sp, rnd(6, 12), Math.cos(a) * sp, rnd(0.25, 0.5), rnd(0.8, 1.2)); }
+    if (O.shake !== false) { shk.amp = 0.3; shk.t = shk.dur = 0.4; }
+    return { collapse() { stormCollapseNow(); }, cancel() { stormOff(); } };
+  }
+  function stormCollapseNow() {                                         // ถูกตัด (เช่นผู้เล่นตาย): เริ่มยุบจากขนาดตอนนี้เลย
+    if (!stm.on || stm.t >= stm.D) return;
+    stm.rEnd = stormRad(stm.t); stm.ds = Math.min(stm.ds, stm.t); stm.D0 = stm.t; stm.D = stm.t;
+  }
+  function stormOff() {
+    stm.on = false;
+    stm.rs.forEach(r => { r.mesh.isVisible = false; }); stm.sl.forEach(e => { e.mesh.isVisible = false; });
+    [stm.core, stm.shell, stm.disc].forEach(m => { if (m) m.isVisible = false; });
+  }
+  function updStorm(dt) {
+    if (!stm.on) return 0;
+    stm.t += dt; const t = stm.t, C = stm.C;
+    if (t >= stm.D + C) { stormOff(); return 0; }
+    let rad, hm, k = 0;
+    if (t <= stm.D) { rad = stormRad(t); hm = 1; }
+    else { k = clamp01((t - stm.D) / C); rad = lerp(stm.rEnd, 0.12 * stm.R, k * k); hm = 1 - 0.65 * k; }       // ช่วงยุบ: หดเข้าแกนแบบเร่ง
+    const decay = clamp01((t - stm.ds) / Math.max(0.01, stm.D0 + C - stm.ds));                                // 0 → 1 : ไล่ชั้นนอกออกก่อน
+    const appear = clamp01(t / 0.25), fadeAll = k > 0.8 ? 1 - (k - 0.8) / 0.2 : 1, gx = stm.x, gy = stm.y, gz = stm.z, H = stm.H;
+    for (const r of stm.rs) {
+      const m = r.mesh, vis = r.v0 * appear * (1 - clamp01((decay - r.th) / 0.14)) * fadeAll;
+      r.ang += r.spd * (1 + 1.2 * decay) * dt;                                                                  // หดแล้วหมุนเร็วขึ้น
+      if (vis <= 0.01) { m.isVisible = false; continue; }
+      const Ri = Math.max(0.05, rad * r.rm);
+      m.position.set(gx, gy + r.y * (0.5 + 0.5 * hm), gz); m.rotation.y = r.ang;
+      if (r.kind === 'spiral') m.scaling.set(Ri, 1, Ri); else m.scaling.set(Ri, H * hm * r.hm, Ri);
+      m.visibility = vis; m.isVisible = true;
+    }
+    for (const e of stm.sl) {                                                                                   // เส้นฟันเล็กโคจรคนละความเร็ว
+      e.a += e.spd * (1 + decay) * dt;
+      const vis = appear * (1 - clamp01((decay - e.th) / 0.14)) * fadeAll, m = e.mesh;
+      if (vis <= 0.01) { m.isVisible = false; continue; }
+      const rr = rad * e.fr; m.position.set(gx + Math.sin(e.a) * rr, gy + 0.5 + H * hm * e.yh, gz + Math.cos(e.a) * rr);
+      m.rotation.set(0, e.a + Math.PI / 2, 0); m.scaling.set(0.05, 0.05, e.len); m.visibility = 0.95 * vis; m.isVisible = true;
+    }
+    const cs = k < 0.6 ? 1 : Math.max(0, 1 - (k - 0.6) / 0.4), cm = (0.55 + 0.45 * rad / stm.R) * cs, pulse = 1 + 0.08 * Math.sin(t * 40);   // แกนขาวอยู่ถึงท้าย แล้วหดแล้วจาง
+    stm.core.position.set(gx, gy + H * 0.4 * hm, gz); stm.core.scaling.set(1.8 * cm * pulse + 0.01, H * 0.8 * hm * Math.max(0.1, cs), 1.8 * cm * pulse + 0.01); stm.core.visibility = 0.95 * appear * cs; stm.core.isVisible = cs > 0.01;
+    stm.shell.position.copyFrom(stm.core.position); stm.shell.scaling.set(3.4 * cm + 0.01, H * 0.8 * hm * Math.max(0.1, cs), 3.4 * cm + 0.01); stm.shell.visibility = 0.35 * appear * cs; stm.shell.isVisible = cs > 0.01;
+    const dr = Math.max(0.1, rad * 1.1); stm.disc.position.set(gx, gy + 0.05, gz); stm.disc.scaling.set(2 * dr, 2 * dr, 1); stm.disc.visibility = 0.42 * appear * fadeAll; stm.disc.isVisible = true;   // เงาถ่านบนพื้น
+    if (t < stm.D) {                                                                                           // ฝุ่น เศษ วงคลื่น เส้นพลังบนพื้น (เฉพาะช่วง active)
+      if ((stm.ringT -= dt) <= 0) { stm.ringT = 0.4; ringSpawn({ x: gx, y: gy + 0.12, z: gz, flat: true, s0: rad * 0.5, s1: rad * 2.3, life: 0.7, v: 0.55, mat: rndPick([mat.white, mat.steel]) }); }
+      if ((stm.dustT -= dt) <= 0) { stm.dustT = 0.09; const a = rnd(0, 6.283), r = rad * rnd(0.7, 1.05); dustGrayAt(gx + Math.sin(a) * r, gy + 0.3, gz + Math.cos(a) * r, 4, 1.2); }
+      if ((stm.chunkT -= dt) <= 0) { stm.chunkT = 0.12; const a = rnd(0, 6.283), r = rad * rnd(0.5, 0.95), sp = rnd(6, 12); chunkSpawn(gx + Math.sin(a) * r, gy, gz + Math.cos(a) * r, Math.cos(a) * sp, rnd(6, 12), -Math.sin(a) * sp, rnd(0.2, 0.45), rnd(0.8, 1.2)); }
+      if ((stm.strT -= dt) <= 0) { stm.strT = 0.06; const a = rnd(0, 6.283), r = rad * rnd(0.5, 1); streakSpawn(gx + Math.sin(a) * r, gy + 0.25, gz + Math.cos(a) * r, a + Math.PI / 2, rnd(3, 6), 16, 0.3, 0.06); }
+    }
+    return 1;
+  }
+
+  // ---------- ระเบิดเส้นฟันรอบทิศ ----------
+  function radialBurst(o) {
+    if (!ok || !bur.core) return;
+    const R = o.radius || 13, yaw = o.yaw || 0;
+    Object.assign(bur, { on: true, t: 0, x: o.x, y: o.y, z: o.z, yaw, R, strN: 0 });
+    bur.bl.forEach((b, i) => {                                           // สุ่มใบฟัน: ยาว/มุม/ความเร็วไม่เท่ากัน ส่วนหนึ่งเน้นด้านหน้า ส่วนหนึ่งยกขึ้นเฉียง
+      b.a = Math.random() < 0.45 ? yaw + rnd(-1.45, 1.45) : rnd(0, 6.2832);
+      b.e = Math.random() < 0.3 ? rnd(0.18, 0.85) : rnd(0, 0.14);
+      b.d = rnd(0, 0.06); b.te = rnd(0.16, 0.3); b.R = R * rnd(0.45, 1.05); b.L = R * rnd(0.3, 1.0) * (i % 5 === 0 ? 1.2 : 1); b.w = rnd(0.22, 0.65); b.da = rnd(-0.06, 0.06);
+      b.mesh.isVisible = false; if (b.dk) b.dk.isVisible = false; if (b.hh) b.hh.isVisible = false;
+    });
+    // เสี้ยวโค้ง: ครึ่งหนึ่งเอียงชัน (tilt 0.75–1.25 rad) เป็นห่วงยืนพันกันแบบภาพอ้างอิง ที่เหลือเกือบนอนราบ
+    const sws = (arr, dark) => arr.forEach((s, i) => { Object.assign(s, { d: rnd(0, 0.07), life: rnd(0.42, 0.62), r0: rnd(1.2, 2.5), r1: R * rnd(0.3, 0.55) * (dark ? 1.1 : 1), a0: rnd(0, 6.28), rot: rnd(1.2, 2.8) * (Math.random() < 0.5 ? -1 : 1), tilt: (i % 2 ? rnd(-0.35, 0.35) : (Math.random() < 0.5 ? -1 : 1) * rnd(0.75, 1.25)), v0: dark ? 0.8 : 0.95, yy: i * 0.12 }); s.mesh.isVisible = false; });
+    sws(bur.sw, false); sws(bur.sd, true);
+    flareSpawn(o.x, o.y + 0.8, o.z, 3, 10, 0.3, 1);                                                          // จุดศูนย์กลางขาวจ้า
+    ringSpawn({ x: o.x, y: o.y + 0.15, z: o.z, flat: true, s0: 2, s1: R * 2.0, life: 0.55, v: 1, mat: mat.white });
+    ringSpawn({ x: o.x, y: o.y + 0.2, z: o.z, flat: true, s0: 1.5, s1: R * 1.4, life: 0.45, v: 0.8, mat: mat.steel });
+    ringSpawn({ x: o.x, y: o.y + 0.25, z: o.z, flat: true, s0: 1, s1: R * 0.9, life: 0.35, v: 0.9, mat: mat.silver });
+    dustGrayAt(o.x, o.y + 0.3, o.z, 55, R * 0.4); dustAt(o.x, o.y + 0.3, o.z, 20);
+    for (let i = 0; i < 18; i++) { const a = rnd(0, 6.283), sp = rnd(5, 15); chunkSpawn(o.x + Math.sin(a) * 1.5, o.y, o.z + Math.cos(a) * 1.5, Math.sin(a) * sp, rnd(7, 15), Math.cos(a) * sp, rnd(0.25, 0.6), rnd(0.8, 1.3)); }
+    burstSparks(o.x, o.y + 0.5, o.z, 24, 15, 0.4, 0.7, -8, 1);
+    if (O.shake !== false) { shk.amp = 0.45; shk.t = shk.dur = 0.5; }
+  }
+  function placeBlade(m, a, e, ri, ro, w, y0) {
+    const rm = (ri + ro) / 2, ce = Math.cos(e);
+    m.position.set(bur.x + Math.sin(a) * ce * rm, y0 + Math.sin(e) * rm, bur.z + Math.cos(a) * ce * rm);
+    m.rotation.set(-e, a, 0); m.scaling.set(w, 1, Math.max(0.05, ro - ri));
+  }
+  function updBurst(dt) {
+    if (!bur.on) return 0;
+    bur.t += dt; const t = bur.t; let live = 0;
+    if (t > 1.3) { burstOff(); return 0; }
+    for (const b of bur.bl) {
+      const tt = t - b.d; if (tt < 0) { live++; continue; }
+      const u = easeOut3(tt / b.te), ro = b.R * u, q = clamp01((tt - b.te - 0.1) / 0.3);
+      if (q >= 1) { b.mesh.isVisible = false; if (b.dk) b.dk.isVisible = false; if (b.hh) b.hh.isVisible = false; continue; }
+      live++;
+      const ri = lerp(Math.max(0.3, ro - Math.min(b.L, ro * 1.2 + 0.5)), ro, q * q), vis = 1 - q * q, y0 = bur.y + 0.15;      // ปลายหน้าพุ่งออก ปลายหลังตามมาแล้วหดเข้าหาหัว
+      placeBlade(b.mesh, b.a, b.e, ri, ro, b.w, y0); b.mesh.visibility = vis; b.mesh.isVisible = true;
+      if (b.dk) { placeBlade(b.dk, b.a + b.da, b.e, ri * 0.9, ro * 0.97, b.w * 2.3, y0 - 0.06); b.dk.visibility = 0.8 * vis; b.dk.isVisible = true; }   // เงาถ่านกว้างกว่า ซ้อนหลังเส้นขาว
+      if (b.hh) { placeBlade(b.hh, b.a, b.e, ri, ro, b.w * 3.4, y0); b.hh.visibility = 0.22 * vis; b.hh.isVisible = true; }                           // ฮาโลม่วงอ่อนบางๆ
+    }
+    for (const arr of [bur.sw, bur.sd]) for (const s of arr) {
+      const tt = t - s.d; if (tt < 0) { live++; continue; }
+      const k = tt / s.life, m = s.mesh; if (k >= 1) { m.isVisible = false; continue; }
+      live++; const e = easeOut(k), r = lerp(s.r0, s.r1, e);
+      m.position.set(bur.x, bur.y + 0.25 + s.yy, bur.z); m.rotation.set(s.tilt, s.a0 + s.rot * e, 0); m.scaling.set(r, 1, r);
+      m.visibility = s.v0 * Math.pow(1 - k, 1.2) * Math.min(1, tt / 0.03); m.isVisible = true;
+    }
+    const ck = clamp01(t / 0.28), cr = 1.2 + 3.2 * easeOut3(t / 0.1);                                           // แกนขาวจ้าแป๊บเดียว
+    bur.core.position.set(bur.x, bur.y + 0.8, bur.z); bur.core.scaling.setAll(cr); bur.core.visibility = 0.95 * (1 - ck * ck); bur.core.isVisible = ck < 1;
+    const dr = bur.R * 0.45 * easeOut(clamp01(t / 0.25)); bur.disc.position.set(bur.x, bur.y + 0.05, bur.z); bur.disc.scaling.set(2 * dr, 2 * dr, 1);
+    bur.disc.visibility = 0.5 * (1 - clamp01((t - 0.5) / 0.75)); bur.disc.isVisible = true;                   // รอยไหม้บนพื้น
+    if (t < 0.32) for (let i = 0; i < 2; i++) {                                                                // เส้นความเร็วบางๆ ที่ขอบนอก
+      const a = Math.random() < 0.4 ? bur.yaw + rnd(-1.4, 1.4) : rnd(0, 6.283), r0 = bur.R * rnd(0.3, 0.6);
+      streakSpawn(bur.x + Math.sin(a) * r0, bur.y + rnd(0.1, 0.7), bur.z + Math.cos(a) * r0, a, rnd(4, 8), 38, 0.3, 0.045);
+    }
+    return 1;
+  }
+  function burstOff() {
+    bur.on = false;
+    bur.bl.forEach(b => { b.mesh.isVisible = false; if (b.dk) b.dk.isVisible = false; if (b.hh) b.hh.isVisible = false; });
+    bur.sw.concat(bur.sd).forEach(s => { s.mesh.isVisible = false; });
+    if (bur.core) bur.core.isVisible = false; if (bur.disc) bur.disc.isVisible = false;
+  }
+
+  // ---------- วงรวมพลัง (ตอนย่อ) / กระแทกพื้น (ท่า 3) ----------
+  function chargeRing(x, y, z, dur, size) {
+    if (!ok) return;
+    ringSpawn({ x, y, z, flat: true, s0: size * 1.8, s1: size * 0.35, life: dur, v: 0.8, mat: mat.silver });
+    ringSpawn({ x, y: y + 0.03, z, flat: true, s0: size * 1.2, s1: size * 0.25, life: dur * 0.85, v: 0.6, mat: mat.white });
+    flareSpawn(x, y + 0.8, z, 0.6, 2.6, dur, 0.55);
+  }
+  function slam(x, y, z, R, power) {
+    if (!ok) return;
+    const p = power || 1;
+    ringSpawn({ x, y: y + 0.12, z, flat: true, s0: 1.5, s1: R * 2, life: 0.5, v: 1, mat: mat.white });
+    ringSpawn({ x, y: y + 0.18, z, flat: true, s0: 1, s1: R * 1.4, life: 0.38, v: 0.8, mat: mat.steel });
+    flareSpawn(x, y + 0.6, z, 2.5, R * 1.1, 0.25, 0.9);
+    dustGrayAt(x, y + 0.3, z, 18, R * 0.5);
+    for (let i = 0; i < 8; i++) { const a = rnd(0, 6.283), sp = rnd(4, 10); chunkSpawn(x + Math.sin(a), y, z + Math.cos(a), Math.sin(a) * sp, rnd(5, 11), Math.cos(a) * sp, rnd(0.2, 0.45), rnd(0.7, 1.1)); }
+    burstSparks(x, y + 0.4, z, 14, 11, 0.35, 0.5, -8, 1);
+    if (O.shake !== false) { shk.amp = 0.22 * p; shk.t = shk.dur = 0.3; }
+  }
+
   function cancelAll() {
     for (const k in P) P[k].forEach(e => { e.on = false; e.mesh.isVisible = false; if (e.halo) e.halo.isVisible = false; });
-    barrages.length = 0; pil.on = false; bm.on = ex.on = cw.on = false;
+    barrages.length = 0; pil.on = false; bm.on = ex.on = cw.on = false; stormOff(); burstOff(); chunks.forEach(c => { c.on = false; c.mesh.isVisible = false; });
     [bm.core, bm.mid, bm.outer, ex.core, ex.shell].forEach(m => { if (m) m.isVisible = false; }); cw.waves.forEach(w => { w.mesh.isVisible = false; });
     if (pil.core) [pil.core, pil.shell, pil.halo].forEach(m => { m.isVisible = false; });
     if (glow) glow.isEnabled = false;
@@ -457,7 +738,7 @@ const SkillFX = (() => {
     if (!ok || !scene || scene.isDisposed) return;
     dt = Math.min(dt, 0.05);
     camBasis(); updBarrages(dt); updPillar(dt);
-    const n = updPools(dt) + updBeam(dt) + updEx(dt) + updWaves(dt);
+    const n = updPools(dt) + updBeam(dt) + updEx(dt) + updWaves(dt) + updStorm(dt) + updBurst(dt) + updChunks(dt);
     if (glow) glow.isEnabled = n > 0 || pil.on || barrages.length > 0;
   }
 
@@ -468,6 +749,7 @@ const SkillFX = (() => {
         if (disposeObs) scene.onDisposeObservable.remove(disposeObs);
         for (const k in P) P[k].forEach(e => { if (e.halo) e.halo.dispose(); e.mesh.dispose(); });
         cw.waves.forEach(w => w.mesh.dispose());
+        xtra.forEach(m => { try { m.dispose(); } catch (e) {} }); if (dustG) dustG.dispose();
         [pil.core, pil.shell, pil.halo, bm.core, bm.mid, bm.outer, ex.core, ex.shell, tpl.ring, tpl.box, tpl.quad, tpl.shard, tpl.sphere, tpl.crescent].forEach(m => m && m.dispose());
         Object.values(mat).forEach(m => m.dispose()); Object.values(tex).forEach(t => t.dispose());
         if (dust) dust.dispose();
@@ -475,10 +757,12 @@ const SkillFX = (() => {
       }
     } catch (e) { console.warn('[skill-fx] dispose', e); }
     for (const k in P) P[k].length = 0;
+    xtra.length = 0; chunks.length = 0; stm.rs.length = 0; stm.sl.length = 0; bur.bl.length = 0; bur.sw.length = 0; bur.sd.length = 0;
+    stm.on = bur.on = false; stm.core = stm.shell = stm.disc = bur.core = bur.disc = null; dustG = dustGPos = null;
     barrages.length = 0; pil.on = bm.on = ex.on = cw.on = false; pil.core = pil.shell = pil.halo = bm.core = bm.mid = bm.outer = ex.core = ex.shell = null; cw.waves.length = 0;
     glow = dust = dustPos = shakeObs = disposeObs = null; ok = false; scene = null;
     Object.keys(mat).forEach(k => delete mat[k]); Object.keys(tex).forEach(k => delete tex[k]); Object.keys(tpl).forEach(k => delete tpl[k]);
   }
 
-  return { init, update, dashBoom, barrage, hitSpark, lockRing, finisher, beam, explosion, crescent, cancelAll, dispose, get ready() { return ok; } };
+  return { init, update, dashBoom, barrage, hitSpark, lockRing, finisher, beam, explosion, crescent, storm, radialBurst, chargeRing, slam, cancelAll, dispose, get ready() { return ok; } };
 })();
