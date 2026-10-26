@@ -18,14 +18,14 @@
   addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === 'k') hit(); else if (k === 'l') kill(); });
   const b = document.createElement('button');
   b.textContent = '⚔';
-  b.style.cssText = 'position:fixed;right:18px;bottom:28px;width:64px;height:64px;border-radius:50%;border:2px solid #fff8;background:#0008;color:#fff;font-size:28px;z-index:6;touch-action:manipulation';
+  b.style.cssText = 'position:fixed;right:18px;bottom:28px;width:64px;height:64px;border-radius:50%;border:2px solid #fff8;background:#0008;color:#fff;font-size:28px;z-index:6;touch-action:none;-webkit-user-select:none;user-select:none';
   b.addEventListener('pointerdown', e => { e.preventDefault(); hit(); });
   document.body.appendChild(b);
 })();
 // ===== PLAYER XYZ OVERLAY =====
 (() => {
   const panel = document.createElement('section');
-  panel.style.cssText = 'position:fixed;left:8px;top:52px;z-index:7;width:210px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:10px;border:1px solid #ffffff66;border-radius:10px;background:rgba(10,20,32,.88);color:#fff;font:12px/1.5 system-ui,sans-serif;box-shadow:0 3px 12px #0005;touch-action:manipulation';
+  panel.style.cssText = 'position:fixed;left:8px;top:52px;z-index:7;width:210px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:10px;border:1px solid #ffffff66;border-radius:10px;background:rgba(10,20,32,.88);color:#fff;font:12px/1.5 system-ui,sans-serif;box-shadow:0 3px 12px #0005;touch-action:none;-webkit-user-select:none;user-select:none';
   panel.innerHTML = '<b>📍 พิกัดผู้เล่น</b><button id="xyzHide" style="float:right;background:#ffffff22;color:white;border:0;border-radius:4px;padding:3px 6px">ซ่อน</button><div id="xyzValues" style="font:13px/1.8 monospace;margin-top:5px">กำลังรอผู้เล่น…</div><div style="color:#cbd5e1;margin:4px 0 7px">วางของใช้ X,Z · Y คือระดับพื้น</div><button id="xyzCopy" style="width:100%;padding:7px;border:0;border-radius:5px;background:#2563eb;color:white">คัดลอก X,Z</button><button id="xyzPlace" style="width:100%;padding:7px;margin-top:4px;border:0;border-radius:5px;background:#16803d;color:white">คัดลอกบรรทัด PLACE</button><div id="xyzMsg" style="color:#a7f3d0"></div>';
   document.body.appendChild(panel);
   const toggle = document.createElement('button');

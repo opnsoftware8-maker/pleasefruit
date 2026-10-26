@@ -2,16 +2,49 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
 <title>Island Fruits — Phase 1</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #6fb7e8; touch-action: none; user-select: none; -webkit-user-select: none; font-family: system-ui, sans-serif; }
-  #c { width: 100%; height: 100%; display: block; outline: none; }
-  #zone { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 50%; transform: translateX(-50%); background: rgba(20,30,50,.6); color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 15px; }
+  *, *::before, *::after {
+    box-sizing: border-box;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  html, body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-overscroll-behavior: none;
+    touch-action: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    background: #000;
+    font-family: system-ui, sans-serif;
+  }
+  #c {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    outline: none;
+  }
+  #zone { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 50%; transform: translateX(-50%); background: rgba(20,30,50,.6); color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 15px; pointer-events: none; }
   #joy { position: fixed; left: calc(env(safe-area-inset-left, 0px) + 28px); bottom: calc(env(safe-area-inset-bottom, 0px) + 36px); width: 130px; height: 130px; border-radius: 50%; background: rgba(255,255,255,.22); border: 2px solid rgba(255,255,255,.55); touch-action: none; }
-  #knob { position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.8); }
-  #log { display: none; position: fixed; left: 8px; right: 8px; top: 50px; max-height: 35%; overflow: auto; background: rgba(120,0,0,.8); color: #fff; font: 12px/1.4 monospace; padding: 8px; border-radius: 8px; white-space: pre-wrap; }
-  #load { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #1d2b3f; color: #fff; font-size: 18px; }
+  #knob { position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.8); pointer-events: none; }
+  #log { display: none; position: fixed; left: 8px; right: 8px; top: 50px; max-height: 35%; overflow: auto; background: rgba(120,0,0,.8); color: #fff; font: 12px/1.4 monospace; padding: 8px; border-radius: 8px; white-space: pre-wrap; touch-action: auto; -webkit-user-select: text; user-select: text; }
+  #load { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #1d2b3f; color: #fff; font-size: 18px; pointer-events: none; }
 </style>
 </head>
 <body>

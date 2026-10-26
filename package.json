@@ -1,0 +1,10 @@
+{
+  "name": "island-fruits",
+  "version": "1.0.0",
+  "description": "Island Fruits 3D Adventure",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "echo 'No build step required'"
+  }
+}
