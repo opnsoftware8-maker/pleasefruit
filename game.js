@@ -733,6 +733,8 @@ function fadeProps(p) {
   if (Cb) Cb.init({ getPlayer: () => player, mobs, load, Health: _HP, Stamina: window.Stamina,
     getHeading: () => heading, setHeading: h => { heading = h; player.wrap.rotation.y = h + CFG.faceOffset; }, cfg: CFG.combat || {},
     heightAt, skillDash, cancelDash, stun: stunMob, unstun: unstunMob, knock: knockMob });   // อาวุธ/สกิล (src/combat.js)
+  if (typeof PlayerStats !== 'undefined') PlayerStats.init({ Health: _HP, Stamina: window.Stamina, cfg: CFG.playerStats || {} });   // สถิติผู้เล่น (src/player-stats.js) — ต้องหลัง bindPlayer
+  if (typeof PlayerStatsUI !== 'undefined' && typeof PlayerStats !== 'undefined') PlayerStatsUI.init(PlayerStats, CFG.playerStats || {});   // ปุ่ม More + popup (src/player-stats-ui.js)
   updateCam(player.wrap.position, true);
   engine.runRenderLoop(() => { if (!Display.blocked) update(); scene.render(); });   // แนวตั้งบนมือถือ → พักเกมไว้
   $('load').style.display = 'none';

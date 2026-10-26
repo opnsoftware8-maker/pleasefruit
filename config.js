@@ -34,7 +34,8 @@ const CFG = {
   // ===== ผู้เล่น: HP + สถิติ (อ่านโดย src/health.js) =====
   player: {
     hp: 100,             // HP สูงสุดของผู้เล่น
-    regen: 0,            // ฟื้น HP ต่อวินาที (0 = ไม่ฟื้นเอง)
+    regen: 0,            // (เดิม) ฟื้น HP ค่าคงที่ต่อวินาที — ใช้เมื่อ regenPct เป็น null เท่านั้น
+    regenPct: 0.05,      // ฟื้น HP = 5% ของ Max HP ต่อวินาที (หลังไม่โดนตี regenDelay วินาที) — 0 = ไม่ฟื้นเอง, null = ใช้ regen ค่าคงที่
     regenDelay: 5,       // ไม่โดนตีนานเท่านี้ก่อนเริ่มฟื้น (วินาที)
     iframe: 0.5,         // อมตะหลังโดนตี (วินาที) กันโดนรัวหลายที
     respawn: 3,          // ตายแล้วเกิดใหม่ใน (วินาที)
@@ -42,6 +43,15 @@ const CFG = {
     stats: { power: 1, defense: 0 },   // power = ตัวคูณดาเมจที่ทำ, defense = ลดดาเมจที่โดน (0–0.9)
     hud: { left: 16, top: 28, width: 190, height: 16 },   // แถบ HP (px)
     debugKeys: false,    // true = กด H เพื่อโดน 15 (ทดสอบ HP / ท่า hit / ท่าตาย)
+  },
+  // ===== สถิติผู้เล่น (อ่านโดย src/player-stats.js + src/player-stats-ui.js) =====
+  playerStats: {
+    pointsPerLevel: 3,   // แต้มต่อเลเวลที่เพิ่ม (Level 1 = 0 แต้ม) → แต้มรวม = (Level - 1) × 3
+    perPoint: { staminaMax: 5, meleeDamage: 5, maxHp: 5, fruitDamage: 5, swordDamage: 5 },
+    // อาวุธไหนนับเป็นสถิติอะไร: 'melee' (หมัด/อาวุธประชิดทั่วไป) หรือ 'sword' — อาวุธที่ไม่อยู่ในลิสต์นับเป็น melee
+    weaponClass: { dagger: 'melee', dualAxe: 'melee', sword: 'sword' },
+    debugLevelUp: true,  // true = มีปุ่มทดสอบ "Lv +1" ในหน้า Stats (ยังไม่มีระบบ EXP) — ปิดเป็น false ก่อนปล่อยจริง
+    more: { right: 10, top: 56 },   // ตำแหน่งปุ่ม More (px) — ใต้ปุ่มเต็มจอมุมขวาบน
   },
   // ===== การต่อสู้ (อ่านโดย src/combat.js) =====
   // อาวุธแต่ละชิ้นเป็น component: model (ไฟล์ใน assets/weapon/) + stats + skills — ทับเฉพาะค่าที่อยากเปลี่ยนได้
