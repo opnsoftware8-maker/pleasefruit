@@ -109,15 +109,9 @@ const Combat = (() => {
   function init(c) {   // c = { getPlayer, mobs, load, Health, Stamina, getHeading, setHeading, cfg }
     ctx = c; cfg = c.cfg || {};
     weapons = deepMerge(WEAPONS, cfg.weapons); skills = deepMerge(SKILLS, cfg.skills);
-    let initialHotbar = cfg.hotbar || DEF_HOTBAR;
-    if (typeof PlayerStats !== 'undefined' && PlayerStats.getHotbar) {
-      initialHotbar = PlayerStats.getHotbar();
-    }
-    hotbar = initialHotbar.filter(id => weapons[id]);
-    if (!hotbar.length) hotbar = ['dagger'];
+    hotbar = (cfg.hotbar || DEF_HOTBAR).filter(id => weapons[id]);
     const keys = Object.assign({}, DEF_KEYS, cfg.keys || {});
     addEventListener('keydown', e => {
-      if (typeof StatUI !== 'undefined' && StatUI.isOpen()) return;
       if (e.repeat) return;
       const n = /^Digit([1-9])$/.exec(e.code);          // เลข 1-9 = เลือกช่อง Hotbar
       if (n && hotbar[+n[1] - 1]) { equip(hotbar[+n[1] - 1]); return; }
@@ -127,14 +121,10 @@ const Combat = (() => {
       const b = document.createElement('div');
       b.style.cssText = 'position:fixed;right:126px;bottom:48px;width:72px;height:72px;border-radius:50%;background:rgba(255,120,100,.3);border:3px solid rgba(255,255,255,.85);color:#fff;font:700 13px sans-serif;display:flex;align-items:center;justify-content:center;z-index:20;touch-action:none;user-select:none;-webkit-user-select:none;text-shadow:0 1px 3px #000';
       b.textContent = 'ATTACK';
-      b.addEventListener('pointerdown', e => {
-        if (typeof StatUI !== 'undefined' && StatUI.isOpen()) return;
-        e.preventDefault(); use('light');
-      });
+      b.addEventListener('pointerdown', e => { e.preventDefault(); use('light'); });
       document.body.appendChild(b);
     }
     spKeyHandler = e => {                                // Z / X = สกิลพิเศษ (ตั้งปุ่มได้ที่ CFG.combat.specialKeys)
-      if (typeof StatUI !== 'undefined' && StatUI.isOpen()) return;
       if (e.repeat) return;
       const sk = Object.assign({}, SPECIAL_KEYS, cfg.specialKeys || {});
       for (const slot of SPECIAL_SLOTS) if ((sk[slot] || []).includes(e.code)) { e.preventDefault(); useSpecial(slot); }
@@ -311,9 +301,7 @@ const Combat = (() => {
     if (ctx.Stamina && !ctx.Stamina.spend(sk.cost || 0)) return false;  // Stamina ไม่พอ (แถบกะพริบแดง)
     const { cb, step, st, n } = stepOf(w, sk, id);
     comboIdx = step; comboId = id;
-    const spdMult = (typeof PlayerStats !== 'undefined' && PlayerStats.get) ? PlayerStats.get('attackSpeed') : 1.0;
-    const cdMult = (typeof PlayerStats !== 'undefined' && PlayerStats.get) ? PlayerStats.get('attackCooldown') : 1.0;
-    const spd = Math.max(0.1, (w.stats.speed || 1) * spdMult);
+    const spd = Math.max(0.1, w.stats.speed || 1);
     const time = (st.time || sk.time) / spd, hitAt = st.hitAt == null ? sk.hitAt : st.hitAt;
     if (cfg.autoAim !== false) {                                       // ช่วยเล็ง: หันหามอนที่ใกล้ที่สุด
       const t = nearest(p, w.stats.range * 1.8, w.stats.arc * 1.5);
@@ -324,7 +312,7 @@ const Combat = (() => {
     pose.mirror = !!(st.mirror && cfg.mirrorLeft !== false);          // ท่า 2 ของขวานคู่: กลับซ้าย-ขวาให้แขนอีกข้างฟาด (ปิดได้ที่ CFG.combat.mirrorLeft = false)
     if (p.anim) p.anim.act(clip, { duration: time });
     fxStart(w, st);
-    cur = { id, sk, w, cb, st, last: n > 1 && step === n - 1, time, hitAt, t: 0, did: false, gap: ((st.gap || 0) * cdMult) / spd,
+    cur = { id, sk, w, cb, st, last: n > 1 && step === n - 1, time, hitAt, t: 0, did: false, gap: (st.gap || 0) / spd,
       mult: (sk.dmgMult || 1) * (st.mult || 1) };
     comboT = 0; return true;
   }
@@ -349,9 +337,7 @@ const Combat = (() => {
   function strike() {
     const p = ctx.getPlayer(), { sk, w, st } = cur;
     const pw = (ctx.Health && ctx.Health.player && ctx.Health.player.stats && ctx.Health.player.stats.power) || 1;   // สถิติผู้เล่นเก็บที่ health.js
-    const swordBonus = (typeof PlayerStats !== 'undefined' && PlayerStats.get) ? (PlayerStats.get('swordDamageBonus') || 0) : 0;
-    const baseDamage = (w.stats.damage || 0) + swordBonus;
-    const dmg = Math.max(1, Math.round(baseDamage * cur.mult * pw));
+    const dmg = Math.max(1, Math.round(w.stats.damage * cur.mult * pw));
     const range = st.range || w.stats.range, arc = (st.arc || w.stats.arc) * (sk.arcMult || 1);   // แต่ละท่าทับระยะ/มุมได้
     for (const m of ctx.mobs) {
       if (m.phase && m.phase !== 'alive') continue;
@@ -436,9 +422,7 @@ const Combat = (() => {
   const planar = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   const dmgOf = (w, mult) => {
     const pw = (ctx.Health && ctx.Health.player && ctx.Health.player.stats && ctx.Health.player.stats.power) || 1;
-    const swordBonus = (typeof PlayerStats !== 'undefined' && PlayerStats.get) ? (PlayerStats.get('swordDamageBonus') || 0) : 0;
-    const baseDamage = (w.stats.damage || 0) + swordBonus;
-    return Math.max(1, Math.round(baseDamage * mult * pw));
+    return Math.max(1, Math.round(w.stats.damage * mult * pw));
   };
   const later = (delay, fn) => sched.push({ t: Math.max(0, delay), fn });
   function hurt(m, amount, tag, wid) {                       // ดาเมจจริงผ่าน Health.damage เส้นเดียวกับฟันปกติ
@@ -480,8 +464,7 @@ const Combat = (() => {
     let ok = false;
     try { ok = SPECIAL_TYPES[d.type](p, w, d, slot); } catch (e) { console.error('[combat] special', e); abortSpecial(); }
     if (!ok) { if (ctx.Stamina) ctx.Stamina.add(d.cost || 0); return false; }    // เริ่มไม่ได้ → คืน Stamina
-    const skillCdMult = (typeof PlayerStats !== 'undefined' && PlayerStats.get) ? PlayerStats.get('skillCooldown') : 1.0;
-    spCd[key] = spCdMax[key] = Math.max(0.1, (d.cooldown || 0) * skillCdMult);
+    spCd[key] = spCdMax[key] = d.cooldown || 0;
     if (typeof Events !== 'undefined') Events.emit('skill:used', { slot, type: d.type, weapon: wId });
     return true;
   }
