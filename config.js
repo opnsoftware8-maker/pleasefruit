@@ -43,38 +43,11 @@ const CFG = {
     hud: { left: 16, top: 28, width: 190, height: 16 },   // แถบ HP (px)
     debugKeys: false,    // true = กด H เพื่อโดน 15 (ทดสอบ HP / ท่า hit / ท่าตาย)
   },
-  // ===== ระบบสเตตัสผู้เล่น, อัปเกรด, และค่าสถานะ (อ่านโดย src/player-stats.js) =====
-  stats: {
-    startingMoney: 1000,
-    startingWeapon: 'dagger',
-    base: {
-      maxHp: 100,
-      maxStamina: 100,
-      fistDamage: 10,
-      fruitDamage: 15,
-      swordDamage: 20,
-      attackSpeed: 1.0,
-      attackCooldown: 1.0,
-      skillCooldown: 1.0,
-      walkSpeed: 9.0,
-      runSpeed: 13.5,
-      dashDistance: 5.5
-    },
-    upgradeBonus: {
-      stamina: 5,              // +5 Max Stamina ต่อแต้ม
-      fistDamagePerStamina: 1, // เพิ่มดาเมจหมัดตามแต้ม Stamina (+1 ต่อแต้ม)
-      hp: 5,                   // +5 Max HP ต่อแต้ม
-      fruit: 5,                // +5 Fruit Damage ต่อแต้ม
-      sword: 5                 // +5 Sword Damage ต่อแต้ม
-    },
-    pointsPerLevel: 3,         // ได้รับ 3 Stat Points ทุกครั้งที่อัปเลเวล (เวล 1 พิเศษ: 0 พอยท์)
-    pointCostPerUpgrade: 1     // อัปเกรด 1 ครั้งใช้ 1 พอยท์สเตตัส (ไม่อัปด้วยเงิน)
-  },
   // ===== การต่อสู้ (อ่านโดย src/combat.js) =====
   // อาวุธแต่ละชิ้นเป็น component: model (ไฟล์ใน assets/weapon/) + stats + skills — ทับเฉพาะค่าที่อยากเปลี่ยนได้
   combat: {
     weapon: 'dagger',                 // อาวุธเริ่มต้น
-    hotbar: ['dagger'],               // เริ่มต้นด้วยมีดสั้น/ดาบสั้นเท่านั้น ดาบยาวและขวานคู่อยู่ในระบบอาวุธสำหรับร้านค้าในอนาคต
+    hotbar: ['dagger', 'sword', 'dualAxe'],      // ช่อง 1, 2, ... (กดเลขบนคีย์บอร์ดหรือแตะที่ช่องเพื่อเปลี่ยน)
     autoAim: true,                    // หันหามอนที่ใกล้ที่สุดตอนฟัน
     button: true,                     // ปุ่ม ATTACK บนจอ
     keys: { light: ['KeyJ'], heavy: ['KeyK'] },   // J = ฟันเบา (คอมโบตามอาวุธ), K = ฟันหนัก
