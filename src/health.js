@@ -273,5 +273,17 @@ const Health = (() => {
     }
   }
 
-  return { init, register, damage, heal, kill, update, bindPlayer, damagePlayer, healPlayer, player: P };
+  function setPlayerMaxHp(amount) {
+    if (!amount || amount <= 0) return;
+    const diff = amount - P.hpMax;
+    P.hpMax = Math.round(amount);
+    if (diff > 0) {
+      P.hp = Math.min(P.hpMax, P.hp + diff);
+    } else {
+      P.hp = Math.min(P.hpMax, P.hp);
+    }
+    drawHud();
+  }
+
+  return { init, register, damage, heal, kill, update, bindPlayer, damagePlayer, healPlayer, setPlayerMaxHp, player: P };
 })();
