@@ -194,7 +194,7 @@ const Health = (() => {
     stats: { power: 1, defense: 0 },     // power = ตัวคูณดาเมจที่ผู้เล่นทำ (combat.js อ่านค่านี้) / defense = ลดดาเมจที่โดน (0–0.9)
     cfg: {}, hud: null
   };
-  const PDEF = { hp: 100, regen: 0, regenDelay: 5, respawn: 3, iframe: 0.5, spawn: { x: 0, z: 0 }, stats: {}, debugKeys: false,
+  const PDEF = { hp: 100, regen: 0, regenPct: 0.05, regenDelay: 5, respawn: 3, iframe: 0.5, spawn: { x: 0, z: 0 }, stats: {}, debugKeys: false,
     hud: { left: 16, top: 28, width: 190, height: 16 } };
 
   function bindPlayer(p, cfg) {
@@ -251,7 +251,10 @@ const Health = (() => {
     if (!P.p) return;
     if (P.iT > 0) P.iT -= dt;
     if (P.phase === 'dead') { if ((P.t += dt) >= P.cfg.respawn) revivePlayer(); return; }
-    if (P.cfg.regen > 0 && P.hp < P.hpMax && now - P.lastHit > P.cfg.regenDelay) { P.hp = Math.min(P.hpMax, P.hp + P.cfg.regen * dt); drawHud(); }
+    // ฟื้น HP แบบเปอร์เซ็นต์: regenPct (0.05 = 5% ของ Max HP ต่อวินาที) — Max HP เพิ่มจากสถิติ Health → ฟื้นเร็วขึ้นตาม
+    // regenPct = null/ไม่ใส่ → ใช้ regen แบบค่าคงที่เดิม (ต่อวินาที)
+    const rate = P.cfg.regenPct != null ? P.hpMax * P.cfg.regenPct : P.cfg.regen;
+    if (rate > 0 && P.hp < P.hpMax && now - P.lastHit > P.cfg.regenDelay) { P.hp = Math.min(P.hpMax, P.hp + rate * dt); drawHud(); }
   }
 
   // ---------- เรียกทุกเฟรม ----------

@@ -337,7 +337,7 @@ const Combat = (() => {
   function strike() {
     const p = ctx.getPlayer(), { sk, w, st } = cur;
     const pw = (ctx.Health && ctx.Health.player && ctx.Health.player.stats && ctx.Health.player.stats.power) || 1;   // สถิติผู้เล่นเก็บที่ health.js
-    const dmg = Math.max(1, Math.round(w.stats.damage * cur.mult * pw));
+    const dmg = Math.max(1, Math.round((w.stats.damage + statBonus(wId)) * cur.mult * pw));   // + โบนัสจากสถิติ Melee/Sword (src/player-stats.js)
     const range = st.range || w.stats.range, arc = (st.arc || w.stats.arc) * (sk.arcMult || 1);   // แต่ละท่าทับระยะ/มุมได้
     for (const m of ctx.mobs) {
       if (m.phase && m.phase !== 'alive') continue;
@@ -420,9 +420,10 @@ const Combat = (() => {
   const hasFX = () => typeof SkillFX !== 'undefined' && SkillFX;
   const alive = m => !!(m && m.wrap && (!m.phase || m.phase === 'alive') && !(m.hp <= 0) && !m.wrap.isDisposed());
   const planar = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+  const statBonus = id => (typeof PlayerStats !== 'undefined' && PlayerStats.damageBonus) ? PlayerStats.damageBonus(id) : 0;   // ไม่มี player-stats.js → 0 (เกมเดิมไม่เปลี่ยน)
   const dmgOf = (w, mult) => {
     const pw = (ctx.Health && ctx.Health.player && ctx.Health.player.stats && ctx.Health.player.stats.power) || 1;
-    return Math.max(1, Math.round(w.stats.damage * mult * pw));
+    return Math.max(1, Math.round((w.stats.damage + statBonus(wId)) * mult * pw));   // + โบนัสจากสถิติ Melee/Sword
   };
   const later = (delay, fn) => sched.push({ t: Math.max(0, delay), fn });
   function hurt(m, amount, tag, wid) {                       // ดาเมจจริงผ่าน Health.damage เส้นเดียวกับฟันปกติ
