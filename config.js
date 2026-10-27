@@ -489,25 +489,19 @@ const PREFABS = {
   skWorkbench:{f:'world/survivekit/workbench.glb',s:1},
 };
 
-// ===== หมู่บ้านในโซน NPC / สุ่มผล — KayKit Medieval Hexagon (assets/mediavalbuid) + Platformer/SurviveKit บางชิ้น =====
-// ถ้าอาคารเล็ก/ใหญ่เกินไป แก้เลข s (สเกล) ตรงนี้ที่เดียว  |  r = รัศมีชน
+// ===== หมู่บ้านในโซน NPC / สุ่มผล — ใช้เฉพาะโมเดลใน assets/mediavalbuid (KayKit Medieval Hexagon) เท่านั้น =====
+// s = สเกล (ใหญ่กว่าผู้เล่นชัดเจน; แก้เลขเดียวปรับทั้งประเภท)  |  r = รัศมีชน
 Object.assign(PREFABS, {
-  bHomeA:{f:'mediavalbuid/building_home_A_blue.gltf',s:2.6,r:3.4},
-  bHomeB:{f:'mediavalbuid/building_home_B_blue.gltf',s:2.6,r:3.4},
-  bTavern:{f:'mediavalbuid/building_tavern_blue.gltf',s:2.7,r:3.8},
-  bMarket:{f:'mediavalbuid/building_market_blue.gltf',s:2.7,r:3.8},
-  bBlacksmith:{f:'mediavalbuid/building_blacksmith_blue.gltf',s:2.6,r:3.6},
-  bLumber:{f:'mediavalbuid/building_lumbermill_blue.gltf',s:2.6,r:3.8},
-  bChurch:{f:'mediavalbuid/building_church_blue.gltf',s:2.8,r:4.2},
-  bCastleBlue:{f:'mediavalbuid/building_castle_blue.gltf',s:2.8,r:6},
-  bWindmill:{f:'mediavalbuid/building_windmill_blue.gltf',s:2.6,r:3.6},
-  bTowerA:{f:'mediavalbuid/building_tower_A_blue.gltf',s:2.4,r:2.6},
-  bWell:{f:'mediavalbuid/building_well_blue.gltf',s:2.4,r:1.6},
-  pfFlowers:{f:'world/platform/flowers.glb',s:2.2},
-  pfFlowersT:{f:'world/platform/flowers-tall.glb',s:2.2},
-  pfHedge:{f:'world/platform/hedge.glb',s:2.4,r:1},
-  pfSign:{f:'world/platform/sign.glb',s:2.2},
-  pfPine:{f:'world/platform/tree-pine.glb',s:2.6,r:.5},
+  bHomeA:{f:'mediavalbuid/building_home_A_blue.gltf',s:4.2,r:5.4},
+  bHomeB:{f:'mediavalbuid/building_home_B_blue.gltf',s:4.2,r:5.4},
+  bTavern:{f:'mediavalbuid/building_tavern_blue.gltf',s:4.6,r:6},
+  bBlacksmith:{f:'mediavalbuid/building_blacksmith_blue.gltf',s:4.4,r:5.8},
+  bLumber:{f:'mediavalbuid/building_lumbermill_blue.gltf',s:4.6,r:6},
+  bChurch:{f:'mediavalbuid/building_church_blue.gltf',s:4.8,r:6.2},
+  bCastleBlue:{f:'mediavalbuid/building_castle_blue.gltf',s:5,r:8},
+  bWindmill:{f:'mediavalbuid/building_windmill_blue.gltf',s:4.6,r:5.5},
+  bWatermill:{f:'mediavalbuid/building_watermill_blue.gltf',s:4.4,r:5.6},
+  bTowerA:{f:'mediavalbuid/building_tower_A_blue.gltf',s:3.8,r:3.6},
 });
 
 const MON_DIR = {blob:'monster/blob/',big:'monster/big/',fly:'monster/flying/'};
@@ -610,44 +604,33 @@ const KEEPOUT=[
 const RINGS=[[CASTLE[0],CASTLE[1],'#c0392b',9],[ARENA[0],ARENA[1],'#e67e22',6]];
 
 const TX=TOWN[0],TZ=TOWN[1];
-// ===== หมู่บ้าน (โซน NPC / สุ่มผล) — เบาๆ ไม่แน่น: ปราสาท 1 + โบสถ์ + ตลาด + โรงเตี๊ยม + โรงตีเหล็ก + บ้าน 5 + กังหันลม + โรงเลื่อย + หอคอย 2 + บ่อน้ำ ฯลฯ
-// ทางเดินเดิม (PATHS) ผ่านที่ z=100 / z=112 / x=106 / x=126 / x=222 / x=168 → ไม่วางอาคารทับเส้นเหล่านี้
-// fc = หันหน้าเข้าหาลานกลางเมือง (ถ้าอาคารหันผิดด้าน ให้เปลี่ยนมุมเป็น + Math.PI)
-const fc=(k,x,z)=>[k,x,z,Math.atan2(TX-x,TZ-z)];
+// ===== หมู่บ้าน (โซน NPC / สุ่มผล) — วางเรียงตามขอบรั้วที่ราบสูง เว้นกลางเมืองโล่ง =====
+// ที่ราบสูงเมือง: x 62..278, z 48..192 (รั้วอยู่รอบขอบ) | กลางเมือง (168,118) มี Mage + ทางเดินเดิม → ไม่วางอะไรในรัศมี ~45
+// ทางเดินเดิมที่หลบ: x=126 และ x=222 (ทางขึ้นทางลาด z<100), z=100, z=112 (x106-168), x=106 (z112-170), z=170 (x62-106 + สะพาน)
+// กติกาการหัน: อาคารหันหน้า "ไปทางทิศของขอบที่มันตั้งอยู่" — ขอบใต้หันใต้, ขอบเหนือหันเหนือ, ขอบตะวันตกหันตะวันตก, ขอบตะวันออกหันตะวันออก
+//   (สมมติหน้าอาคาร = แกน +Z ของโมเดล; ถ้าเห็นว่าหันกลับด้านทั้งหมด ให้เปลี่ยน TOWN_FACE ทุกค่าเป็น +Math.PI)
+const TOWN_FACE={S:Math.PI, N:0, E:Math.PI/2, W:-Math.PI/2};
+const townB=(k,x,z,side)=>[k,x,z,TOWN_FACE[side]];
 const TOWN_PROPS=[
-  ['mage',TX,TZ-6,Math.PI,'npc'],
+  ['mage',TX,TZ-6,Math.PI,'npc'],                 // NPC สุ่มผลเดิม (กลางเมือง)
 
-  // --- อาคารหลัก ---
-  ['bCastleBlue',168,168,Math.PI],                       // ท้ายเมือง หันหน้าลงมาทางทางเข้า
-  fc('bChurch',126,158), fc('bTavern',208,152),
-  fc('bMarket',132,136), fc('bBlacksmith',210,128),
-  fc('bWindmill',242,150), fc('bLumber',244,116),
-  ['bTowerA',116,84,Math.PI], ['bTowerA',226,84,Math.PI],   // หอคอยเฝ้าทางเข้าเมือง
+  // ---- ขอบใต้ (หันใต้ z≈64): ประตูเมือง 2 บาน = ทางลาด x114-138 และ x210-234 → หอคอยคู่เฝ้าสองข้างของแต่ละประตู ----
+  townB('bTowerA',106,64,'S'), townB('bTowerA',146,64,'S'),     // เฝ้าประตูตะวันตก (ทางขึ้น x=126)
+  townB('bTowerA',202,64,'S'), townB('bTowerA',242,64,'S'),     // เฝ้าประตูตะวันออก (ทางขึ้น x=222)
+  townB('bHomeA',76,68,'S'),                                    // บ้านมุมตะวันตกเฉียงใต้ (ชิดรั้วมุม)
+  townB('bHomeB',174,68,'S'),                                   // บ้านระหว่างประตู 2 บาน
 
-  // --- บ้านพัก ---
-  fc('bHomeA',140,122), fc('bHomeB',198,108),
-  fc('bHomeA',150,86),  fc('bHomeB',186,84), fc('bHomeA',196,170),
+  // ---- ขอบตะวันตก (หันตะวันตก x≈74): ติดแม่น้ำ (x50-62) ----
+  townB('bWatermill',74,108,'W'),                               // โรงสีน้ำต้องอยู่ริมน้ำ
+  townB('bHomeA',74,142,'W'),                                   // บ้านริมรั้วฝั่งตะวันตก
 
-  // --- ลานกลางเมือง ---
-  ['bWell',168,134,0], ['pfFlowers',160,134,0], ['pfFlowersT',176,134,0.5],
-  ['flagNL',154,162,0], ['flagNL',182,162,0],
-  ['pfSign',162,96,Math.PI], ['skCampfirePit',168,92,0], ['skBedroll',174,90,.6],
+  // ---- ขอบเหนือ (หันเหนือ z≈168): แนวอาคารสำคัญ ไกลจากทางเข้า ----
+  townB('bChurch',128,168,'N'), townB('bCastleBlue',174,164,'N'), townB('bTavern',222,168,'N'),
 
-  // --- ของประกอบอาคาร ---
-  ['skWorkbenchAnvil',200,120,Math.PI/2], ['barrel',216,138,0], ['crate',212,142,.4],
-  ['barrel',200,146,0], ['crateB',204,144,.3],
-  ['crate',124,132,.2], ['crateB',128,130,.5], ['skBox',138,132,0],
-  ['skChest',172,160,Math.PI], ['pfHedge',148,150,Math.PI/2], ['pfHedge',148,142,Math.PI/2],
-
-  // --- ต้นไม้ + ป่าเล็กๆ (Camp) ---
-  ['tree',112,98,0], ['tree',116,148,0], ['pfPine',112,172,0], ['pfPine',226,172,0],
-  ['tree',186,150,0], ['tree',152,150,0],
-  ['pine',246,92,0], ['pine',254,100,0], ['tree',240,86,0], ['pfPine',252,88,0], ['tree',248,106,0], ['pine',234,96,0],
-
-  // --- ชาวบ้าน (NPC ตัวเล็ก) ---
-  ...at('npcPink','npc',[[176,124,Math.PI]]), ...at('chicken','npc',[[158,126,0]]),
-  ...at('dog','npc',[[192,116,0]]), ...at('cat','npc',[[146,128,0]]),
-  ...at('npcGreen','npc',[[162,148,0]]), ...at('mush','npc',[[182,140,0]]),
+  // ---- ขอบตะวันออก (หันตะวันออก x≈246): พื้นที่โล่งกว้าง ----
+  townB('bHomeB',246,100,'E'),                                  // บ้านริมรั้วฝั่งตะวันออก
+  townB('bWindmill',246,134,'E'),                               // กังหันลมต้องการที่โล่ง รับลม
+  townB('bLumber',246,166,'E'),                                 // โรงเลื่อยมุมตะวันออกเฉียงเหนือ
 ];
 
 const PLACE=[

@@ -538,7 +538,7 @@ addEventListener('keyup', e => heldCodes.delete(e.code));
 addEventListener('blur', () => heldCodes.clear());
 const isHeld = codes => codes.some(c => heldCodes.has(c));
 
-let player, heading = 0, fc = 0;
+let player, heading = 0, frameCount = 0;
 
 // ===== Stamina + Dash =====
 // ปรับค่าได้ 3 ทาง: (1) ใส่ CFG.stamina / CFG.dash ใน config.js  (2) แก้ค่าเริ่มต้นด้านล่าง  (3) ตอนเกมรันผ่านคอนโซล เช่น Stamina.cfg.max = 150
@@ -704,7 +704,7 @@ function update() {
   p.y = heightAt(p.x, p.z);
   updateMobs(dt);          // ← อัปเดตมอนสเตอร์ทุกเฟรม
   Hx.update(dt);           // ← HP / ท่าตาย / เกิดใหม่ / แถบเลือด
-  updateCam(p); if ((fc++ & 3) === 0) fadeProps(p);
+  updateCam(p); if ((frameCount++ & 3) === 0) fadeProps(p);
   if (Lt) Lt.update(dt, focus);   // กรอบเงาตามกล้อง
   const z = ZONES.find(z => Math.hypot(p.x - z.x, p.z - z.z) < z.r);
   $('zone').textContent = z ? z.name : 'ลานกลางเกาะ';
