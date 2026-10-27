@@ -44,6 +44,11 @@ const CFG = {
     hud: { left: 16, top: 28, width: 190, height: 16 },   // แถบ HP (px)
     debugKeys: false,    // true = กด H เพื่อโดน 15 (ทดสอบ HP / ท่า hit / ท่าตาย)
   },
+  // ===== สีพื้นเกาะ (ให้ game.js อ่าน) — ค่าเดิม: A '#e2c88a' (ทรายเข้ม), ทางเดิน '#cfa66a' =====
+  // A = พื้นที่ราบสูงโซน NPC / สุ่มผล ทั้งโซน | pathColor = พื้นทางเดินในโซน | ลบบรรทัดนี้ทิ้งเพื่อกลับสีเดิม
+  groundColors: { A: '#97d65f' },
+  pathColor: '#ecdcb0',
+
   // ===== สถิติผู้เล่น (อ่านโดย src/player-stats.js + src/player-stats-ui.js) =====
   playerStats: {
     pointsPerLevel: 3,   // แต้มต่อเลเวลที่เพิ่ม (Level 1 = 0 แต้ม) → แต้มรวม = (Level - 1) × 3
@@ -527,6 +532,7 @@ Object.assign(PREFABS, {
   dcBench:{f:'world/survivekit/workbench.glb',s:3.4,inst:true}, dcAnvil:{f:'world/survivekit/workbench-anvil.glb',s:3.4,inst:true}, dcGrind:{f:'world/survivekit/workbench-grind.glb',s:3.4,inst:true},
   // เพิงไม้: structure (4 เสา) + structure-roof (หลังคาไม้กระดาน) วางที่จุดเดียวกัน / structure-canvas = หลังคาผ้าใบ (แผงตลาด)
   dcMush:{f:'world/platform/mushrooms.glb',s:3,inst:true},
+  dcStructL:{f:'world/survivekit/structure.glb',s:9.5,inst:true}, dcRoofL:{f:'world/survivekit/structure-roof.glb',s:9.5,inst:true},   // ศาลา Mage (ใหญ่กว่าศาลาอื่น)
   dcStruct:{f:'world/survivekit/structure.glb',s:5.5,inst:true}, dcRoof:{f:'world/survivekit/structure-roof.glb',s:5.5,inst:true}, dcCanvas:{f:'world/survivekit/structure-canvas.glb',s:5.5,inst:true},
 });
 
@@ -649,8 +655,10 @@ const townFaceRoad=(x,z)=>{
   return Math.round(Math.atan2(bx-x,bz-z)/(Math.PI/2))*(Math.PI/2);
 };
 const townB=(k,x,z,h)=>[k,x,z,h===undefined?townFaceRoad(x,z):h];
+// ตำแหน่ง/ทิศของ Mage NPC (ศาลาคลุมตัวเขาใช้ค่าเดียวกัน → หันทิศเดียวกันเสมอ) — เลื่อนลงใต้ 10 หน่วยจากกลางเมือง จะได้ชิดกลุ่มตกแต่ง
+const MAGE_POS=[TX,TZ-10], MAGE_FACE=Math.PI;
 const TOWN_PROPS=[
-  ['mage',TX,TZ-6,Math.PI,'npc'],                 // NPC สุ่มผลเดิม (กลางเมือง)
+  ['mage',MAGE_POS[0],MAGE_POS[1],MAGE_FACE,'npc'],                 // NPC สุ่มผลเดิม (กลางเมือง)
 
   // ---- แถวขอบรั้วใต้ (z≈62): ชิดรั้ว + ขนาบถนนประตู x=126 และ x=222 หันเข้าถนน ----
   townB('bHomeA',84,62), townB('bHomeB',110,62), townB('bHomeA',142,62),
@@ -730,37 +738,38 @@ const TOWN_DECOR=[
 
 ];
 
-// ===== ลานตกแต่งรอบ Mage NPC (จุดสุ่มผล กลางเมือง 168,112) — ศาลาไม้ 4 เสา + หลังคาไม้คลุม Mage =====
-// ทางเดินที่เข้ามาหา Mage: x=168 (จากใต้ ทางแยก z=100) และ z=112 (จากตะวันตก) → เว้นแนวทางไว้ ไม่วางของทับ (ห่างกึ่งกลางทาง ≥ 4.5)
-// เรียงเป็นกลุ่ม: ธงคู่ + ป้ายหน้าทางเข้า | สวนดอกไม้/เห็ดฝั่งตะวันตก | ลังถังหลังศาลา | พุ่มไม้ฉากหลัง | กองไฟนั่งเล่นฝั่งตะวันออก
+// ===== ลานตกแต่งรอบ Mage NPC (จุดสุ่มผล) — ศาลาไม้ 4 เสา + หลังคาไม้ ขนาดใหญ่ คลุม Mage หันทิศเดียวกับ Mage =====
+// ทางเดินที่เข้ามาหา Mage: x=168 (จากใต้ ทางแยก z=100) และ z=112 (จากตะวันตก) → เว้นแนวทางไว้ ไม่วางของทับ
+// เรียงเป็นกลุ่มรอบศาลา: ธงคู่ + ป้ายหน้าทางเข้า | สวนดอกไม้ฝั่งตะวันตก | ลัง/ถัง/เห็ดหลังศาลา | พุ่มไม้ฉากหลัง | กองไฟนั่งเล่นฝั่งตะวันออก
 const MAGE_DECOR=[
-  // ศาลา: เสา 4 ต้น + หลังคาไม้ ตั้งคร่อม Mage (เปิดด้านใต้ที่ผู้เล่นเดินมา)
-  ['dcStruct',168,113,3.14],['dcRoof',168,113,3.14],
+  // ศาลา: คลุม Mage พอดี หันทิศเดียวกับ Mage (MAGE_FACE) — ถ้าศาลาใหญ่/เล็กไป แก้ s ของ dcStructL + dcRoofL (ให้เท่ากัน)
+  ['dcStructL',MAGE_POS[0],MAGE_POS[1]+0.5,MAGE_FACE],['dcRoofL',MAGE_POS[0],MAGE_POS[1]+0.5,MAGE_FACE],
 
   // ทางเข้าด้านใต้: ธงคู่ + ป้ายชี้
-  ['dcFlag',162.6,106.8,0.1],['dcFlag',173.6,108.4,-0.15],['dcSignpost',174.6,104.8,3.4],
+  ['dcFlag',159.6,104.6,0.1],['dcFlag',176.6,104.4,-0.15],['dcSignpost',180.2,104.8,3.4],
 
-  // สวนดอกไม้ฝั่งตะวันตกของทางเข้า
-  ['dcFlowers',157.4,105.2,0.9],['dcFlowersB',155.4,106.8,2.2],['dcPlantB',160.4,104.9,1.3],['dcStones',154.2,104.8,0.5],
+  // สวนดอกไม้ฝั่งตะวันตก
+  ['dcFlowers',156.2,105.6,0.9],['dcFlowersB',154.2,104.4,2.2],['dcPlantB',158.6,103.9,1.3],
+  ['dcStones',153.4,107.0,0.5],['dcFlowersT',156.6,108.0,1.7],
 
-  // กลุ่มสิ่งของหลังศาลาฝั่งตะวันตก (ลัง/ถัง) + เห็ดเวทมนตร์
-  ['dcBarrel',157.8,118.6,0.4],['dcBarrel',160.8,119.8,2.1],['dcCrate',156.4,121.9,1.1],['dcCrate',159.6,122.8,2.6],
-  ['dcPlant',155.0,118.0,4.0],['dcRocksS',153.8,117.8,1.2],
-  ['dcMush',163.6,118.4,0.3],['dcMush',165.6,120.0,1.4],['dcMush',162.4,120.4,2.6],
+  // ลัง/ถัง + เห็ดเวทมนตร์ หลังศาลาฝั่งตะวันตก
+  ['dcBarrel',154.6,117.8,0.4],['dcBarrel',157.4,119.0,2.1],['dcCrate',153.4,121.2,1.1],['dcCrate',156.6,122.2,2.6],
+  ['dcPlant',152.0,117.2,4.0],['dcRocksS',150.6,119.6,1.2],
+  ['dcMush',160.6,116.0,0.3],['dcMush',162.4,117.6,1.4],['dcMush',159.4,118.0,2.6],
 
   // พุ่มไม้ฉากหลัง (เรียงเฉียงเล็กน้อย ไม่ตรงเป๊ะ)
-  ['dcHedge',164.0,124.0,0.12],['dcHedge',169.2,124.9,-0.05],['dcHedge',174.4,124.0,-0.12],
+  ['dcHedge',163.4,121.0,0.12],['dcHedge',168.8,121.9,-0.05],['dcHedge',174.2,121.0,-0.12],
 
   // กองไฟนั่งเล่นฝั่งตะวันออก + ท่อนไม้เป็นที่นั่ง
-  ['dcCampfire',179.4,114.6,0],['dcLogS',176.6,117.4,0.6],['dcLogS',182.0,112.4,2.3],['dcLogS',180.6,118.6,-0.5],
-  ['dcBucket',183.6,115.6,0.4],['dcBox',183.4,118.8,-0.3],
+  ['dcCampfire',181.4,109.4,0],['dcLogS',178.6,112.0,0.6],['dcLogS',184.2,106.8,2.3],['dcLogS',184.0,112.2,-0.5],
+  ['dcBucket',187.0,108.6,0.4],['dcBox',186.2,113.6,-0.3],
 
   // สวนดอกไม้มุมตะวันออกเฉียงเหนือ
-  ['dcFlowers',175.6,121.0,0.7],['dcFlowersT',178.2,122.6,1.8],['dcFlowersB',174.6,123.0,2.9],['dcPlantB',180.6,123.2,0.8],
-  ['dcRocksS',183.8,122.0,0.9],
+  ['dcFlowers',177.0,117.2,0.7],['dcFlowersT',179.6,118.8,1.8],['dcFlowersB',175.8,119.4,2.9],['dcPlantB',182.2,118.8,0.8],
+  ['dcRocksS',185.4,117.0,0.9],
 
-  // ต้นไม้ฝั่งหลัง ช่วยกรอบฉาก
-  ['dcTreeA',156.0,128.0,0.5],['dcPineS',181.5,129.0,-0.1],
+  // ต้นไม้ปิดฉากหลัง
+  ['dcTreeA',150.0,125.0,0.5],['dcPineS',185.0,125.0,-0.1],
 ];
 
 const PLACE=[

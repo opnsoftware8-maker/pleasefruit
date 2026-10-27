@@ -123,7 +123,7 @@ function updateCam(t, snap) {
 // ---------- แผนที่ → ความสูง ----------
 const CELL = CFG.cell, COLS = MAP[0].length, ROWS = MAP.length, X0 = -COLS * CELL / 2, ZN = ROWS * CELL / 2;
 const LV = CFG.lv || { ',': 0, g: 2, h: 4, A: 4, p: 0 };   // ระดับพื้น (ทราย 0 / หญ้า 3 / ที่ราบสูง 6 — ตั้งใน config.js)  // p = สะพานท่าเรือ (เดินได้ ไม่วาดพื้น)
-const COL = { ',': '#e8d49a', g: '#79c24f', h: '#6fae45', A: '#e2c88a', p: '#9a6b3a' };
+const COL = Object.assign({ ',': '#e8d49a', g: '#79c24f', h: '#6fae45', A: '#e2c88a', p: '#9a6b3a' }, CFG.groundColors || {});   // แก้สีพื้นได้ที่ config.js → groundColors
 const RAMP = { '^': [0, 1], v: [0, -1], '>': [1, 0], '<': [-1, 0] };
 const chAt = (c, i) => (c < 0 || i < 0 || c >= COLS || i >= ROWS) ? '.' : MAP[i][c];
 // '=' = สะพานข้ามน้ำ: ความสูงเท่าฝั่งที่ติดกัน (ห้ามวางสะพานสองช่องติดกัน)
@@ -191,7 +191,7 @@ for (let i = 0; i < ROWS; i++) for (let c = 0; c < COLS; c++) {
   const ch = MAP[i][c]; if (ch === '.' || ch === '=') continue;
   const h = corners(c, i), x0 = X0 + c * CELL, x1 = x0 + CELL, z1 = ZN - i * CELL, z0 = z1 - CELL;
   const shade = 0.95 + 0.06 * ((c + i) & 1) + 0.05 * Math.sin(c * 0.23) * Math.cos(i * 0.19);   // ลายหย่อมสีเบา ๆ ให้พื้นกว้างไม่จืด
-  const top = B.Color3.FromHexString(RAMP[ch] ? '#a89b84' : (flatH(c, i) !== null && ch !== 'p' && onPath(x0 + CELL / 2, z0 + CELL / 2)) ? '#cfa66a' : COL[ch]).scale(shade);
+  const top = B.Color3.FromHexString(RAMP[ch] ? '#a89b84' : (flatH(c, i) !== null && ch !== 'p' && onPath(x0 + CELL / 2, z0 + CELL / 2)) ? (CFG.pathColor || '#cfa66a') : COL[ch]).scale(shade);
   const sx = ((h[1] + h[2]) - (h[0] + h[3])) / 2 / CELL, sz = ((h[0] + h[1]) - (h[2] + h[3])) / 2 / CELL;
   const nl = Math.hypot(sx, 1, sz);
   quad([x0, h[0], z1], [x1, h[1], z1], [x1, h[2], z0], [x0, h[3], z0], [-sx / nl, 1 / nl, -sz / nl], top);
