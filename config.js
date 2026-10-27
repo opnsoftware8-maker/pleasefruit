@@ -7,7 +7,7 @@ const CFG = {
   cell: 4,
   lv: { ',': 0, g: 3, h: 6, A: 6, p: 0 },
   step: 3,
-  cam: { fov: Math.PI / 2, pitch: 55, dist: 55 },
+  cam: { fov: Math.PI / 2, pitch: 39, dist: 14 },
   scale: 1,
   fenceStep: 1, // เติมรั้วทุกช่วง ไม่เว้นช่อง
   farFreeze: 90,
@@ -504,6 +504,31 @@ Object.assign(PREFABS, {
   bWatermill:{f:'mediavalbuid/building_watermill_blue.gltf',s:19.5,r:13},
 });
 
+// ===== โมเดลตกแต่ง: ใช้เฉพาะ world/camp, world/platform, world/survivekit (ไม่มี pirate) — inst:true = instance ประหยัดโหลด =====
+// สเกลปรับให้เข้ากับอาคารใหญ่ (บ้าน s≈18) — แก้เลข s ที่นี่ที่เดียว | ตัวแปรขนาดต่างกัน (…B / …S) ใช้ไฟล์เดียวกัน ไม่เพิ่มการโหลด
+Object.assign(PREFABS, {
+  // Platform Kit
+  dcBarrel:{f:'world/platform/barrel.glb',s:3.2,inst:true}, dcCrate:{f:'world/platform/crate.glb',s:3,inst:true},
+  dcFlowers:{f:'world/platform/flowers.glb',s:3.2,inst:true}, dcFlowersB:{f:'world/platform/flowers.glb',s:2.3,inst:true}, dcFlowersT:{f:'world/platform/flowers-tall.glb',s:3,inst:true},
+  dcPlant:{f:'world/platform/plant.glb',s:3.2,inst:true}, dcPlantB:{f:'world/platform/plant.glb',s:2.3,inst:true},
+  dcHedge:{f:'world/platform/hedge.glb',s:4,inst:true}, dcSign:{f:'world/platform/sign.glb',s:3,inst:true},
+  dcStones:{f:'world/platform/stones.glb',s:3,inst:true}, dcRocksS:{f:'world/platform/rocks.glb',s:2.6,inst:true},
+  dcTreeA:{f:'world/platform/tree.glb',s:5,inst:true},
+  // Camp Kit
+  dcPine:{f:'world/camp/Tree-high.glb',s:4.4,inst:true}, dcPineS:{f:'world/camp/Tree-high.glb',s:3.4,inst:true},
+  dcFlag:{f:'world/camp/flag.glb',s:3.6,inst:true}, dcTent:{f:'world/camp/Tent.glb',s:3.6,r:2},
+  // Survival Kit
+  dcCampfire:{f:'world/survivekit/campfire-pit.glb',s:2.8,inst:true}, dcBedroll:{f:'world/survivekit/bedroll.glb',s:2.6,inst:true},
+  dcBox:{f:'world/survivekit/box.glb',s:2.6,inst:true}, dcBoxL:{f:'world/survivekit/box-large.glb',s:3,inst:true}, dcChest:{f:'world/survivekit/chest.glb',s:3,inst:true},
+  dcLog:{f:'world/survivekit/tree-log.glb',s:3.2,inst:true}, dcLogS:{f:'world/survivekit/tree-log-small.glb',s:3,inst:true},
+  dcWood:{f:'world/survivekit/resource-wood.glb',s:2.8,inst:true}, dcPlanks:{f:'world/survivekit/resource-planks.glb',s:2.8,inst:true},
+  dcBucket:{f:'world/survivekit/bucket.glb',s:2.4,inst:true}, dcAxe:{f:'world/survivekit/tool-axe.glb',s:2.4,inst:true}, dcHammer:{f:'world/survivekit/tool-hammer.glb',s:2.4,inst:true},
+  dcSignpost:{f:'world/survivekit/signpost.glb',s:3.2,inst:true},
+  dcBench:{f:'world/survivekit/workbench.glb',s:3.4,inst:true}, dcAnvil:{f:'world/survivekit/workbench-anvil.glb',s:3.4,inst:true}, dcGrind:{f:'world/survivekit/workbench-grind.glb',s:3.4,inst:true},
+  // เพิงไม้: structure (4 เสา) + structure-roof (หลังคาไม้กระดาน) วางที่จุดเดียวกัน / structure-canvas = หลังคาผ้าใบ (แผงตลาด)
+  dcStruct:{f:'world/survivekit/structure.glb',s:5.5,inst:true}, dcRoof:{f:'world/survivekit/structure-roof.glb',s:5.5,inst:true}, dcCanvas:{f:'world/survivekit/structure-canvas.glb',s:5.5,inst:true},
+});
+
 const MON_DIR = {blob:'monster/blob/',big:'monster/big/',fly:'monster/flying/'};
 const MON_FACE = 0;
 const SIZE = {npc:.6,mini:.7,large:.95,sub:1.8,boss:3};
@@ -652,6 +677,57 @@ const TOWN_PROPS=[
   townB('bLumber',246,136,-Math.PI/2),
 ];
 
+// ===== ของตกแต่งหมู่บ้าน — วางอัตโนมัติด้วยสคริปต์ตรวจแล้ว: ไม่ทับอาคาร/ทางเดิน/ลานกลางเมือง (Mage), ไม่วางหน้าประตูบ้าน =====
+// รูปแบบ [prefab, x, z, หมุน(เรเดียน)] — ลบทั้งบล็อกนี้ (และ ...TOWN_DECOR ใน PLACE) = กลับเป็นเมืองเดิม
+const TOWN_DECOR=[
+  // ---- ค่ายพัก (รั้วไม้ + เต็นท์ + กองไฟ + ผ้าปูนอน + ของใช้) — มุมตะวันออกเฉียงใต้ เว้นช่องประตูด้านตะวันตกหันเข้าถนน ----
+  ['fenceE',232,76,0],['fenceE',232,90,0],['fenceE',236,76,0],['fenceE',236,90,0],
+  ['fenceE',240,76,0],['fenceE',240,90,0],['fenceE',244,76,0],['fenceE',244,90,0],
+  ['fenceE',248,76,0],['fenceE',248,90,0],['fenceE',252,76,0],['fenceE',252,90,0],
+  ['fenceE',254,78,1.57],['fenceE',254,82,1.57],['fenceE',254,86,1.57],['fenceE',230,78,1.57],
+  ['fenceE',230,88,1.57],['dcFlag',230.8,74.8,0],['dcFlag',230.8,91.2,0],['dcSignpost',228.1,83,-1.57],
+  ['dcCampfire',242,82.5,0],['dcTent',236.5,86.4,3.49],['dcTent',248.5,86.2,2.84],['dcBedroll',235,79.6,0.5],
+  ['dcBedroll',237.8,78.8,-0.2],['dcBedroll',247.5,79.2,2.9],['dcLogS',238.8,82.4,0.6],['dcLogS',245.8,82.9,2.3],
+  ['dcBoxL',252,79.2,0.3],['dcBox',252.2,82.8,-0.5],['dcWood',231.8,87.2,1.1],['dcBucket',250.6,86.9,0],
+  // ---- เพิงไม้ 4 เสา + หลังคา: โรงตีเหล็ก / ช่างไม้ / แผงตลาดผ้าใบ ----
+  ['dcStruct',115,84,0],['dcRoof',115,84,0],['dcAnvil',114.6,84.2,0.4],['dcGrind',117.2,83.4,-0.5],
+  ['dcHammer',111.4,86.4,0.8],['dcBucket',119,86.6,0],['dcWood',118.6,81,1.3],['dcStruct',129,143,3.14],
+  ['dcRoof',129,143,3.14],['dcBench',129,143.1,0],['dcPlanks',124.8,144.4,0.5],['dcLog',133,140.8,1.9],
+  ['dcAxe',132.6,145.4,0.9],['dcStruct',226,128,3.14],['dcCanvas',226,128,3.14],['dcBoxL',225,128.2,0.3],
+  ['dcChest',227.6,128.4,-0.5],['dcBarrel',221.6,128.4,0.2],['dcCrate',230.3,127,0.8],['dcSign',229.4,131.8,3.4],
+  // ---- กลุ่มของตกแต่งข้างอาคาร (ข้างตัวอาคาร ไม่วางหน้าประตู) ----
+  ['dcBarrel',156.4,58.1,3.18],['dcBarrel',158.5,59.9,4.95],['dcCrate',154.7,60.6,3.03],['dcCrate',157.2,61.8,2.67],
+  ['dcPlant',153.3,57.6,4.13],['dcLog',241.8,120.3,2.88],['dcWood',239.2,122.2,3.46],['dcBucket',239.2,119.4,1.88],
+  ['dcAxe',237.7,120.3,2.75],['dcBarrel',254.1,120.1,1.34],['dcBarrel',254.0,117.3,2.35],['dcCrate',257.0,119.7,1.58],
+  ['dcCrate',256.3,117.0,0.65],['dcPlant',255.8,122.7,2.22],['dcBarrel',186.6,71.1,2.01],['dcBarrel',184.2,69.6,3.45],
+  ['dcCrate',188.0,68.5,2.12],['dcCrate',185.4,67.5,1.01],['dcPlant',189.7,71.3,2.21],['dcFlowers',161.4,71.1,0.96],
+  ['dcFlowersT',163.1,68.7,1.54],['dcFlowersB',163.6,72.9,2.97],['dcPlantB',164.0,71.0,1.59],['dcStones',161.4,72.7,0.99],
+  ['dcBarrel',247.7,168.2,3.18],['dcBarrel',250.3,169.1,5.06],['dcCrate',247.0,171.1,3.17],['dcCrate',249.7,171.4,2.6],
+  ['dcPlant',246.1,169.2,4.1],['dcFlowers',188.4,58.1,2.71],['dcFlowersT',188.5,61.1,3.73],['dcFlowersB',185.6,57.9,4.39],
+  ['dcPlantB',186.0,61.3,2.89],['dcStones',187.5,55.3,3.02],['dcBarrel',73.5,72.5,2.44],['dcBarrel',71.9,74.8,3.9],
+  ['dcCrate',70.9,71.0,2.56],['dcCrate',69.9,73.6,2.18],['dcPlant',73.8,69.4,3.31],['dcFlowers',81.4,79.1,0.69],
+  ['dcFlowersT',82.8,76.5,1.87],['dcFlowersB',83.7,80.7,2.48],['dcPlantB',85.1,77.5,1.35],['dcStones',80.8,82.1,1.07],
+  ['dcFlowers',252.4,58.1,3.14],['dcFlowersT',254.7,59.9,4.13],['dcFlowersB',250.4,60.2,4.8],['dcPlantB',253.3,62.0,3.28],
+  ['dcStones',249.6,57.0,3.52],['dcFlowers',123.4,168.4,2.95],['dcFlowersT',125.8,170.1,3.75],['dcFlowersB',121.6,170.5,5.13],
+  ['dcPlantB',124.5,172.2,3.43],['dcStones',120.5,167.5,3.14],['dcLog',86.3,103.9,2.65],['dcWood',83.8,105.9,3.27],
+  ['dcBucket',84.5,101.5,2.31],['dcAxe',82.2,104.0,3.17],['dcBoxL',220.7,112.8,3.32],['dcBox',223.6,113.8,2.78],
+  ['dcChest',219.7,115.6,3.63],['dcSign',223.4,116.5,5.63],['dcFlowers',166.3,169.3,1.38],['dcFlowersT',164.5,167.1,2.3],
+  ['dcFlowersB',166.9,168.8,3.19],['dcPlantB',166.3,165.4,1.9],['dcStones',168.8,171.1,1.35],['dcFlowers',99.5,72.5,2.61],
+  ['dcFlowersT',99.1,75.4,3.68],['dcFlowersB',96.8,71.9,4.23],['dcPlantB',96.6,75.3,3.19],['dcStones',99.0,69.5,3.07],
+  // ---- ต้นไม้ + หินริมรั้ว ----
+  ['dcPine',255.7,147.4,-0.02],['dcRocksS',257.3,146.6,0.67],['dcFlowersB',253.3,149.1,1.54],['dcPineS',67.5,136,-0.28],
+  ['dcHedge',70.9,136.2,-0.09],['dcFlowers',68.7,138.8,0.67],['dcPineS',67.5,58,0.36],['dcHedge',70.9,58.2,-0.35],
+  ['dcFlowers',68.7,60.8,1.16],
+  // ---- สวนเล็ก/ป่าเล็กในช่องว่างของเมือง ----
+  ['dcPine',92.0,136.0,-0.2],['dcTreeA',89.6,131.8,0.74],['dcRocksS',95.5,136.0,0.49],['dcFlowersB',88.5,136.8,2.04],
+  ['dcPlantB',93.4,139.3,0.65],['dcTreeA',92.0,158.0,0.19],['dcFlowers',92.1,161.3,0.96],['dcStones',90.4,155.7,1.52],
+  ['dcPine',252.0,160.0,-0.14],['dcTreeA',247.4,161.6,0.66],['dcRocksS',252.6,156.6,0.39],['dcFlowersB',252.2,163.6,1.93],
+  ['dcPlantB',255.5,159.3,0.56],['dcPlant',181.8,79.6,2.2],['dcFlowers',166.4,80.2,0.5],['dcStones',166.0,76.8,0.97],['dcFlowersB',182.2,76.4,3.1],
+  ['dcPineS',210.0,82.0,-0.0],['dcRocksS',211.8,79.7,1.27],['dcPlant',208.7,84.6,0.26],['dcTreeA',92.0,78.0,-0.07],
+  ['dcFlowers',93.3,75.0,0.8],['dcStones',92.5,80.8,1.44],['dcPineS',116.0,150.0,-0.16],['dcRocksS',118.2,151.9,1.15],
+  ['dcPlant',113.4,148.6,0.2],
+];
+
 const PLACE=[
   // ===== ปราสาท =====
   ...castle(CASTLE[0],CASTLE[1]),
@@ -661,6 +737,7 @@ const PLACE=[
 
   // ===== เมือง NPC =====
   ...TOWN_PROPS,
+  ...TOWN_DECOR,   // ของตกแต่ง/ค่าย/เพิงไม้ในโซนเมือง
 
   // ===== ลานทดสอบสกิล =====
   ['barbarian',ARENA[0],ARENA[1],Math.PI,'dummy'],
