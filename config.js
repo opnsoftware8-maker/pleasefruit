@@ -7,7 +7,7 @@ const CFG = {
   cell: 4,
   lv: { ',': 0, g: 3, h: 6, A: 6, p: 0 },
   step: 3,
-  cam: { fov: Math.PI / 2, pitch: 45, dist: 55 },
+  cam: { fov: Math.PI / 2, pitch: 39, dist: 14 },
   scale: 1,
   fenceStep: 1, // เติมรั้วทุกช่วง ไม่เว้นช่อง
   farFreeze: 90,
@@ -489,6 +489,27 @@ const PREFABS = {
   skWorkbench:{f:'world/survivekit/workbench.glb',s:1},
 };
 
+// ===== หมู่บ้านในโซน NPC / สุ่มผล — KayKit Medieval Hexagon (assets/mediavalbuid) + Platformer/SurviveKit บางชิ้น =====
+// ถ้าอาคารเล็ก/ใหญ่เกินไป แก้เลข s (สเกล) ตรงนี้ที่เดียว  |  r = รัศมีชน
+Object.assign(PREFABS, {
+  bHomeA:{f:'mediavalbuid/building_home_A_blue.gltf',s:2.6,r:3.4},
+  bHomeB:{f:'mediavalbuid/building_home_B_blue.gltf',s:2.6,r:3.4},
+  bTavern:{f:'mediavalbuid/building_tavern_blue.gltf',s:2.7,r:3.8},
+  bMarket:{f:'mediavalbuid/building_market_blue.gltf',s:2.7,r:3.8},
+  bBlacksmith:{f:'mediavalbuid/building_blacksmith_blue.gltf',s:2.6,r:3.6},
+  bLumber:{f:'mediavalbuid/building_lumbermill_blue.gltf',s:2.6,r:3.8},
+  bChurch:{f:'mediavalbuid/building_church_blue.gltf',s:2.8,r:4.2},
+  bCastleBlue:{f:'mediavalbuid/building_castle_blue.gltf',s:2.8,r:6},
+  bWindmill:{f:'mediavalbuid/building_windmill_blue.gltf',s:2.6,r:3.6},
+  bTowerA:{f:'mediavalbuid/building_tower_A_blue.gltf',s:2.4,r:2.6},
+  bWell:{f:'mediavalbuid/building_well_blue.gltf',s:2.4,r:1.6},
+  pfFlowers:{f:'world/platform/flowers.glb',s:2.2},
+  pfFlowersT:{f:'world/platform/flowers-tall.glb',s:2.2},
+  pfHedge:{f:'world/platform/hedge.glb',s:2.4,r:1},
+  pfSign:{f:'world/platform/sign.glb',s:2.2},
+  pfPine:{f:'world/platform/tree-pine.glb',s:2.6,r:.5},
+});
+
 const MON_DIR = {blob:'monster/blob/',big:'monster/big/',fly:'monster/flying/'};
 const MON_FACE = 0;
 const SIZE = {npc:.6,mini:.7,large:.95,sub:1.8,boss:3};
@@ -589,8 +610,44 @@ const KEEPOUT=[
 const RINGS=[[CASTLE[0],CASTLE[1],'#c0392b',9],[ARENA[0],ARENA[1],'#e67e22',6]];
 
 const TX=TOWN[0],TZ=TOWN[1];
+// ===== หมู่บ้าน (โซน NPC / สุ่มผล) — เบาๆ ไม่แน่น: ปราสาท 1 + โบสถ์ + ตลาด + โรงเตี๊ยม + โรงตีเหล็ก + บ้าน 5 + กังหันลม + โรงเลื่อย + หอคอย 2 + บ่อน้ำ ฯลฯ
+// ทางเดินเดิม (PATHS) ผ่านที่ z=100 / z=112 / x=106 / x=126 / x=222 / x=168 → ไม่วางอาคารทับเส้นเหล่านี้
+// fc = หันหน้าเข้าหาลานกลางเมือง (ถ้าอาคารหันผิดด้าน ให้เปลี่ยนมุมเป็น + Math.PI)
+const fc=(k,x,z)=>[k,x,z,Math.atan2(TX-x,TZ-z)];
 const TOWN_PROPS=[
   ['mage',TX,TZ-6,Math.PI,'npc'],
+
+  // --- อาคารหลัก ---
+  ['bCastleBlue',168,168,Math.PI],                       // ท้ายเมือง หันหน้าลงมาทางทางเข้า
+  fc('bChurch',126,158), fc('bTavern',208,152),
+  fc('bMarket',132,136), fc('bBlacksmith',210,128),
+  fc('bWindmill',242,150), fc('bLumber',244,116),
+  ['bTowerA',116,84,Math.PI], ['bTowerA',226,84,Math.PI],   // หอคอยเฝ้าทางเข้าเมือง
+
+  // --- บ้านพัก ---
+  fc('bHomeA',140,122), fc('bHomeB',198,108),
+  fc('bHomeA',150,86),  fc('bHomeB',186,84), fc('bHomeA',196,170),
+
+  // --- ลานกลางเมือง ---
+  ['bWell',168,134,0], ['pfFlowers',160,134,0], ['pfFlowersT',176,134,0.5],
+  ['flagNL',154,162,0], ['flagNL',182,162,0],
+  ['pfSign',162,96,Math.PI], ['skCampfirePit',168,92,0], ['skBedroll',174,90,.6],
+
+  // --- ของประกอบอาคาร ---
+  ['skWorkbenchAnvil',200,120,Math.PI/2], ['barrel',216,138,0], ['crate',212,142,.4],
+  ['barrel',200,146,0], ['crateB',204,144,.3],
+  ['crate',124,132,.2], ['crateB',128,130,.5], ['skBox',138,132,0],
+  ['skChest',172,160,Math.PI], ['pfHedge',148,150,Math.PI/2], ['pfHedge',148,142,Math.PI/2],
+
+  // --- ต้นไม้ + ป่าเล็กๆ (Camp) ---
+  ['tree',112,98,0], ['tree',116,148,0], ['pfPine',112,172,0], ['pfPine',226,172,0],
+  ['tree',186,150,0], ['tree',152,150,0],
+  ['pine',246,92,0], ['pine',254,100,0], ['tree',240,86,0], ['pfPine',252,88,0], ['tree',248,106,0], ['pine',234,96,0],
+
+  // --- ชาวบ้าน (NPC ตัวเล็ก) ---
+  ...at('npcPink','npc',[[176,124,Math.PI]]), ...at('chicken','npc',[[158,126,0]]),
+  ...at('dog','npc',[[192,116,0]]), ...at('cat','npc',[[146,128,0]]),
+  ...at('npcGreen','npc',[[162,148,0]]), ...at('mush','npc',[[182,140,0]]),
 ];
 
 const PLACE=[
