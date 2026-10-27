@@ -526,6 +526,7 @@ Object.assign(PREFABS, {
   dcSignpost:{f:'world/survivekit/signpost.glb',s:3.2,inst:true},
   dcBench:{f:'world/survivekit/workbench.glb',s:3.4,inst:true}, dcAnvil:{f:'world/survivekit/workbench-anvil.glb',s:3.4,inst:true}, dcGrind:{f:'world/survivekit/workbench-grind.glb',s:3.4,inst:true},
   // เพิงไม้: structure (4 เสา) + structure-roof (หลังคาไม้กระดาน) วางที่จุดเดียวกัน / structure-canvas = หลังคาผ้าใบ (แผงตลาด)
+  dcMush:{f:'world/platform/mushrooms.glb',s:3,inst:true},
   dcStruct:{f:'world/survivekit/structure.glb',s:5.5,inst:true}, dcRoof:{f:'world/survivekit/structure-roof.glb',s:5.5,inst:true}, dcCanvas:{f:'world/survivekit/structure-canvas.glb',s:5.5,inst:true},
 });
 
@@ -726,6 +727,40 @@ const TOWN_DECOR=[
   ['dcPineS',210.0,82.0,-0.0],['dcRocksS',211.8,79.7,1.27],['dcPlant',208.7,84.6,0.26],['dcTreeA',92.0,78.0,-0.07],
   ['dcFlowers',93.3,75.0,0.8],['dcStones',92.5,80.8,1.44],['dcPineS',116.0,150.0,-0.16],['dcRocksS',118.2,151.9,1.15],
   ['dcPlant',113.4,148.6,0.2],
+
+];
+
+// ===== ลานตกแต่งรอบ Mage NPC (จุดสุ่มผล กลางเมือง 168,112) — ศาลาไม้ 4 เสา + หลังคาไม้คลุม Mage =====
+// ทางเดินที่เข้ามาหา Mage: x=168 (จากใต้ ทางแยก z=100) และ z=112 (จากตะวันตก) → เว้นแนวทางไว้ ไม่วางของทับ (ห่างกึ่งกลางทาง ≥ 4.5)
+// เรียงเป็นกลุ่ม: ธงคู่ + ป้ายหน้าทางเข้า | สวนดอกไม้/เห็ดฝั่งตะวันตก | ลังถังหลังศาลา | พุ่มไม้ฉากหลัง | กองไฟนั่งเล่นฝั่งตะวันออก
+const MAGE_DECOR=[
+  // ศาลา: เสา 4 ต้น + หลังคาไม้ ตั้งคร่อม Mage (เปิดด้านใต้ที่ผู้เล่นเดินมา)
+  ['dcStruct',168,113,3.14],['dcRoof',168,113,3.14],
+
+  // ทางเข้าด้านใต้: ธงคู่ + ป้ายชี้
+  ['dcFlag',162.6,106.8,0.1],['dcFlag',173.6,108.4,-0.15],['dcSignpost',174.6,104.8,3.4],
+
+  // สวนดอกไม้ฝั่งตะวันตกของทางเข้า
+  ['dcFlowers',157.4,105.2,0.9],['dcFlowersB',155.4,106.8,2.2],['dcPlantB',160.4,104.9,1.3],['dcStones',154.2,104.8,0.5],
+
+  // กลุ่มสิ่งของหลังศาลาฝั่งตะวันตก (ลัง/ถัง) + เห็ดเวทมนตร์
+  ['dcBarrel',157.8,118.6,0.4],['dcBarrel',160.8,119.8,2.1],['dcCrate',156.4,121.9,1.1],['dcCrate',159.6,122.8,2.6],
+  ['dcPlant',155.0,118.0,4.0],['dcRocksS',153.8,117.8,1.2],
+  ['dcMush',163.6,118.4,0.3],['dcMush',165.6,120.0,1.4],['dcMush',162.4,120.4,2.6],
+
+  // พุ่มไม้ฉากหลัง (เรียงเฉียงเล็กน้อย ไม่ตรงเป๊ะ)
+  ['dcHedge',164.0,124.0,0.12],['dcHedge',169.2,124.9,-0.05],['dcHedge',174.4,124.0,-0.12],
+
+  // กองไฟนั่งเล่นฝั่งตะวันออก + ท่อนไม้เป็นที่นั่ง
+  ['dcCampfire',179.4,114.6,0],['dcLogS',176.6,117.4,0.6],['dcLogS',182.0,112.4,2.3],['dcLogS',180.6,118.6,-0.5],
+  ['dcBucket',183.6,115.6,0.4],['dcBox',183.4,118.8,-0.3],
+
+  // สวนดอกไม้มุมตะวันออกเฉียงเหนือ
+  ['dcFlowers',175.6,121.0,0.7],['dcFlowersT',178.2,122.6,1.8],['dcFlowersB',174.6,123.0,2.9],['dcPlantB',180.6,123.2,0.8],
+  ['dcRocksS',183.8,122.0,0.9],
+
+  // ต้นไม้ฝั่งหลัง ช่วยกรอบฉาก
+  ['dcTreeA',156.0,128.0,0.5],['dcPineS',181.5,129.0,-0.1],
 ];
 
 const PLACE=[
@@ -737,7 +772,8 @@ const PLACE=[
 
   // ===== เมือง NPC =====
   ...TOWN_PROPS,
-  ...TOWN_DECOR,   // ของตกแต่ง/ค่าย/เพิงไม้ในโซนเมือง
+  ...TOWN_DECOR,
+  ...MAGE_DECOR,   // ของตกแต่ง/ค่าย/เพิงไม้ในโซนเมือง
 
   // ===== ลานทดสอบสกิล =====
   ['barbarian',ARENA[0],ARENA[1],Math.PI,'dummy'],
