@@ -492,14 +492,16 @@ const PREFABS = {
 // ===== หมู่บ้านในโซน NPC / สุ่มผล — ใช้เฉพาะโมเดลใน assets/mediavalbuid (KayKit Medieval Hexagon) เท่านั้น =====
 // s = สเกล (ใหญ่กว่าผู้เล่นชัดเจน; แก้เลขเดียวปรับทั้งประเภท)  |  r = รัศมีชน
 Object.assign(PREFABS, {
-  bHomeA:{f:'mediavalbuid/building_home_A_blue.gltf',s:7.5,r:4.6},
-  bHomeB:{f:'mediavalbuid/building_home_B_blue.gltf',s:7.5,r:4.6},
-  bTavern:{f:'mediavalbuid/building_tavern_blue.gltf',s:8,r:5.2},
-  bLumber:{f:'mediavalbuid/building_lumbermill_blue.gltf',s:8,r:5.2},
-  bChurch:{f:'mediavalbuid/building_church_blue.gltf',s:8.5,r:5.6},
-  bCastleBlue:{f:'mediavalbuid/building_castle_blue.gltf',s:7.5,r:8},
-  bWindmill:{f:'mediavalbuid/building_windmill_blue.gltf',s:8,r:5.2},
-  bWatermill:{f:'mediavalbuid/building_watermill_blue.gltf',s:7.8,r:5.2},
+  bHomeA:{f:'mediavalbuid/building_home_A_blue.gltf',s:18.75,r:11.5},
+  bHomeB:{f:'mediavalbuid/building_home_B_blue.gltf',s:18.75,r:11.5},
+  bTavern:{f:'mediavalbuid/building_tavern_blue.gltf',s:20,r:13},
+  bMarket:{f:'mediavalbuid/building_market_blue.gltf',s:20,r:13},
+  bBlacksmith:{f:'mediavalbuid/building_blacksmith_blue.gltf',s:19,r:12.5},
+  bLumber:{f:'mediavalbuid/building_lumbermill_blue.gltf',s:20,r:13},
+  bChurch:{f:'mediavalbuid/building_church_blue.gltf',s:21.25,r:14},
+  bCastleBlue:{f:'mediavalbuid/building_castle_blue.gltf',s:18.75,r:20},
+  bWindmill:{f:'mediavalbuid/building_windmill_blue.gltf',s:20,r:13},
+  bWatermill:{f:'mediavalbuid/building_watermill_blue.gltf',s:19.5,r:13},
 });
 
 const MON_DIR = {blob:'monster/blob/',big:'monster/big/',fly:'monster/flying/'};
@@ -624,23 +626,30 @@ const townB=(k,x,z,h)=>[k,x,z,h===undefined?townFaceRoad(x,z):h];
 const TOWN_PROPS=[
   ['mage',TX,TZ-6,Math.PI,'npc'],                 // NPC สุ่มผลเดิม (กลางเมือง)
 
-  // ---- ถนนประตูตะวันตก (x=126): บ้าน 2 ฝั่ง หันเข้าถนน ----
-  townB('bHomeA',115,76), townB('bHomeB',115,88), townB('bHomeB',137,76), townB('bHomeA',137,88),
-  // ---- ถนนประตูตะวันออก (x=222): บ้าน 2 ฝั่ง หันเข้าถนน ----
-  townB('bHomeA',211,76), townB('bHomeB',211,88), townB('bHomeB',233,76), townB('bHomeA',233,88),
-  // ---- ถนนใหญ่ z=100 ด้านเหนือ (ฝั่งตะวันออก) ----
-  townB('bHomeA',206,112),
-  // ---- ถนนฝั่งตะวันตก (x=106): บ้านสองฝั่ง หันเข้าถนน ----
-  townB('bHomeB',95,126), townB('bHomeA',95,144), townB('bHomeA',117,132), townB('bHomeB',117,152),
-  townB('bHomeB',136,124),                                       // ริมทาง z=112 ฝั่งเหนือ (ห่างลานกลาง)
-  townB('bHomeA',74,158),                                        // ริมทางสะพาน z=170 ฝั่งใต้
+  // ---- แถวขอบรั้วใต้ (z≈62): ชิดรั้ว + ขนาบถนนประตู x=126 และ x=222 หันเข้าถนน ----
+  townB('bHomeA',84,62), townB('bHomeB',110,62), townB('bHomeA',142,62),
+  townB('bHomeB',174,62),                                         // กลางระหว่างสองประตู
+  townB('bHomeA',206,62), townB('bHomeB',238,62),
 
-  // ---- อาคารสำคัญ ----
-  ['bCastleBlue',168,164,Math.PI],                               // ปราสาทท้ายเมือง หันลงใต้ เห็นจากทางเข้า
-  ['bChurch',136,168,Math.PI], ['bTavern',204,166,Math.PI],     // โบสถ์/โรงเตี๊ยม แถวเหนือ หันลงใต้
-  townB('bWatermill',74,108,Math.PI/2),                          // โรงสีน้ำริมแม่น้ำ (x50-62) หันเข้าหาถนนฝั่งตะวันตก
-  townB('bWindmill',250,134,-Math.PI/2),                         // กังหันลมที่โล่งฝั่งตะวันออก หันเข้าเมือง
-  townB('bLumber',250,164,-Math.PI/2),                           // โรงเลื่อยมุมตะวันออกเฉียงเหนือ หันเข้าเมือง
+  // ---- ริมถนนใหญ่ z=100 ฝั่งใต้ (หันเหนือเข้าถนน) ----
+  townB('bHomeB',154,84), townB('bHomeA',194,84),
+  townB('bBlacksmith',100,96),                                    // โรงตีเหล็กใกล้ประตูตะวันตก
+
+  // ---- แถวขอบรั้วตะวันตก (x≈74): ชิดรั้ว/แม่น้ำ หันเข้าหาถนน ----
+  townB('bHomeB',74,92),
+  townB('bWatermill',76,122,Math.PI/2),                          // โรงสีน้ำต้องอยู่ริมน้ำ (x50-62) หันเข้าถนน
+  townB('bHomeA',74,150),                                         // ติดถนนทางสะพาน z=170
+
+  // ---- ริมถนน x=106 / z=100 ฝั่งเหนือ ----
+  townB('bHomeA',122,128),                                        // ฝั่งตะวันออกของถนน x=106
+  townB('bMarket',205,117),                                       // ตลาดริมถนนใหญ่
+
+  // ---- แถวขอบรั้วเหนือ: อาคารสำคัญ หันลงใต้เข้าหาเมือง ----
+  ['bChurch',140,164,Math.PI], ['bCastleBlue',186,158,Math.PI], ['bTavern',232,164,Math.PI],
+
+  // ---- แถวขอบรั้วตะวันออก (x≈246): ที่โล่งรับลม หันเข้าเมือง ----
+  townB('bWindmill',246,106,-Math.PI/2),
+  townB('bLumber',246,136,-Math.PI/2),
 ];
 
 const PLACE=[
